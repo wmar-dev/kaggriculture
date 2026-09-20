@@ -37,8 +37,8 @@ def resolve_opponent(name: str) -> str:
 
 def _latest_submission_path() -> Path:
     versions = sorted(
-        (p for p in SUBMISSIONS_DIR.glob("v*") if (p / "main.py").exists()),
-        key=lambda p: p.name,
+        (p for p in SUBMISSIONS_DIR.glob("v*") if (p / "main.py").exists() and p.name[1:].isdigit()),
+        key=lambda p: int(p.name[1:]),
     )
     if not versions:
         raise FileNotFoundError(
@@ -103,6 +103,34 @@ def run_batch(agent_path: str, opponent_name: str, seasons: int, config: dict | 
         "median_money": statistics.median(our_money) if our_money else 0.0,
         "opponent_mean_money": statistics.mean(opp_money) if opp_money else 0.0,
     }
+
+
+def average_win_rate(entry: dict) -> float:
+    results = entry.get("evaluation_results") or []
+    if not results:
+        return 0.0
+    return sum(r["win_rate"] for r in results) / len(results)
+
+
+def check_divergence(entries: list[dict]) -> list[str]:
+    """Flag consecutive submitted versions where the local win-rate trend
+    disagrees with the recorded leaderboard `public_score` trend (spec
+    Edge Cases, constitution Principle II). Only entries that already have
+    a `kaggle_result` are compared -- versions never actually submitted to
+    Kaggle have nothing to diverge from yet.
+    """
+    scored = [e for e in entries if e.get("kaggle_result")]
+    warnings = []
+    for prev, curr in zip(scored, scored[1:]):
+        local_improved = average_win_rate(curr) > average_win_rate(prev)
+        leaderboard_improved = curr["kaggle_result"]["public_score"] > prev["kaggle_result"]["public_score"]
+        if local_improved != leaderboard_improved:
+            warnings.append(
+                f"Divergence: {prev.get('agent_version')} -> {curr.get('agent_version')}: "
+                f"local win-rate {'improved' if local_improved else 'declined'} but "
+                f"leaderboard score {'improved' if leaderboard_improved else 'declined'}"
+            )
+    return warnings
 
 
 def _commit_sha() -> str:

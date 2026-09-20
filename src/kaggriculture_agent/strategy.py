@@ -1,23 +1,39 @@
-"""Baseline rule-based Kaggriculture strategy (research.md R4).
+"""Rule-based Kaggriculture strategy (research.md R4, iterated per User
+Story 2 -- see research.md's Outcome / v2 note and experiments/log.jsonl
+for the before/after evaluation that justified each change below).
 
 Design, deliberately simple per constitution Principle V (Time-Boxed
 Simplicity): every farmer/hand independently tends whatever tile it's
 standing on (water/harvest/dig/plant), or walks toward the nearest tile
 that needs attention when there's nothing to do locally. Crop choice is
-driven by current `yield/tile/day * market price`. No animal husbandry,
-no fertilizing, and no market-impact-aware sell batching in this first
-version -- those are natural targets for the next iteration (User Story 2)
-once this baseline's ceiling is measured against the opponent pool in
-research.md R3.
+driven by current `yield/tile/day * market price`, now also penalized by
+how much of that crop is already growing (diversification, v2) so a
+single good's price isn't crashed by an all-eggs-in-one-basket harvest.
+Sells are now batched (v2) rather than dumping a whole shed stack in one
+order, for the same price-crash reason. Animal husbandry and fertilizing
+remain out of scope -- both need a multi-turn "walk to shed, PICKUP,
+walk back" logistics chain this simple per-tile decision loop doesn't
+track, and are natural targets for a future iteration.
 """
 
 from __future__ import annotations
 
-from kaggriculture_agent.constants import CROPS, DEFAULT_CONFIG, yield_per_tile_per_day
+from kaggriculture_agent.constants import CROPS, DEFAULT_CONFIG, MARKET_PARAMS, yield_per_tile_per_day
 from kaggriculture_agent.observation import GameObservation, tile_kind
 
 MAX_MARKET_ORDERS = DEFAULT_CONFIG["maxMarketOrdersPerTurn"]
 _DIRECTION_DELTA = {"NORTH": (0, -1), "SOUTH": (0, 1), "EAST": (1, 0), "WEST": (-1, 0)}
+
+# Cap how many units of a "premium" item (base price > $100: STRAWBERRY,
+# MELON, MILK, WOOL) we sell in one turn (v2): dumping an entire shed
+# stack of one of these in one SELL order crashes its price hard (their
+# `above_target` > 1, per CONTEST.md's Price Function table). Staples are
+# sold in full every turn as before -- they absorb gluts gently enough
+# that batching isn't worth the shed-overflow risk (the shed's 100-item
+# cap is shared across ALL items, so leaving unsold stock sitting around
+# for non-premium goods needlessly risks discarding a later harvest).
+SELL_BATCH_CAP = 15
+PREMIUM_GOODS = frozenset(item for item, params in MARKET_PARAMS.items() if params["base"] > 100)
 
 
 def _is_harvest_ready(tile: dict, current_day: int) -> bool:
@@ -37,7 +53,16 @@ def _is_harvest_ready(tile: dict, current_day: int) -> bool:
     return current_day - tile["planted_day"] >= first_yield_day
 
 
-def choose_best_crop(money: float, prices: dict) -> str | None:
+def _count_growing_crops(obs: GameObservation) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in obs.my_farm["tiles"]:
+        for tile in row:
+            if isinstance(tile, dict) and tile.get("kind") == "PLANT":
+                counts[tile["crop"]] = counts.get(tile["crop"], 0) + 1
+    return counts
+
+
+def choose_best_crop(money: float, prices: dict, growing_counts: dict[str, int] | None = None) -> str | None:
     """Best crop among affordable seeds.
 
     Value is (yield/tile/day * current price), divided by `first_yield_day`
@@ -47,6 +72,11 @@ def choose_best_crop(money: float, prices: dict) -> str | None:
     metric and the agent over-commits seed money into several melons
     before any of them can pay back, starving cash for the fast-cycling
     WHEAT/CARROT loops that would actually fund expansion early on.
+
+    `growing_counts` (v2), when given, further divides the value by
+    `1 + count already growing` -- a soft diversification penalty so the
+    farm doesn't pile everything into one crop and then crash that
+    crop's own sell price harvesting it all at once.
     """
     best_crop = None
     best_value = -1.0
@@ -55,6 +85,8 @@ def choose_best_crop(money: float, prices: dict) -> str | None:
             continue
         price = prices.get(crop, 0)
         value = yield_per_tile_per_day(crop) * price / info["first_yield_day"]
+        if growing_counts:
+            value /= 1 + growing_counts.get(crop, 0)
         if value > best_value:
             best_value = value
             best_crop = crop
@@ -127,8 +159,10 @@ def _decide_unit_action(obs: GameObservation, pos: tuple[int, int], target_crop:
 def _market_orders(obs: GameObservation, target_crop: str | None) -> list[list]:
     orders: list[list] = []
     for item, qty in obs.shed.items():
-        if qty > 0:
-            orders.append(["SELL", item, qty])
+        if qty <= 0:
+            continue
+        cap = SELL_BATCH_CAP if item in PREMIUM_GOODS else qty
+        orders.append(["SELL", item, min(qty, cap)])
 
     money = obs.my_farm["money"]
     seeds = obs.seeds
@@ -154,7 +188,7 @@ def _market_orders(obs: GameObservation, target_crop: str | None) -> list[list]:
 def baseline_strategy(obs: GameObservation) -> dict:
     prices = obs.market_prices
     money = obs.my_farm["money"]
-    target_crop = choose_best_crop(money, prices)
+    target_crop = choose_best_crop(money, prices, _count_growing_crops(obs))
 
     plant_budget = {target_crop: obs.seeds.get(target_crop, 0)} if target_crop else {}
     claimed: set = set()

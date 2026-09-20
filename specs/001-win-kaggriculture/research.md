@@ -102,6 +102,22 @@ spec FR-002)?
   only if the local evaluation harness shows the rule-based ceiling has
   been reached, per Principle V.
 
+## R4 addendum: v2 iteration, validated (User Story 2)
+
+Measured via `evaluation/run_batch.py` (15 seasons/opponent,
+`experiments/log.jsonl`): v1 (R4's original baseline) scored 100%/60%/67%
+win rate vs random/starter/greedy. Two small, targeted changes -- (a)
+penalizing `choose_best_crop` by how much of that crop is already growing
+(diversification) and (b) capping SELL order size for premium goods
+(STRAWBERRY/MELON/MILK/WOOL) instead of dumping the whole shed stack each
+turn (research.md's original "no market-impact-aware sell batching"
+simplification) -- took v2 to 100% vs all three AND 100% vs v1 itself in
+direct self-play (mean money roughly double v1's). This suggests the
+single biggest lever left unexploited by v1 wasn't crop selection at all,
+but self-inflicted price crashes from selling accumulated stock in one
+shot; batching sells is a stronger lead for a v3 iteration than adding
+entirely new mechanics (animals, fertilizing) would be.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

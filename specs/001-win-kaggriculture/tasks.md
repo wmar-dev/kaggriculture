@@ -83,15 +83,15 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 ### Tests for User Story 2
 
-- [ ] T016 [P] [US2] Unit tests for batch-evaluation aggregation/statistics in `tests/unit/test_run_batch.py` (win/loss/tie counting, mean/median money calculation)
-- [ ] T017 [P] [US2] Integration test for self-play comparison in `tests/integration/test_self_play.py`: evaluating a candidate strategy against a frozen `submissions/v1/main.py` copy as the `previous` opponent
+- [X] T016 [P] [US2] Unit tests for batch-evaluation aggregation/statistics in `tests/unit/test_run_batch.py` (win/loss/tie counting, mean/median money calculation)
+- [X] T017 [P] [US2] Integration test for self-play comparison in `tests/integration/test_self_play.py`: evaluating a candidate strategy against a frozen `submissions/v1/main.py` copy as the `previous` opponent
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Extend `evaluation/run_batch.py` to support a `previous` opponent that loads the most recent `submissions/<version>/main.py` (depends on T008, T013)
-- [ ] T019 [US2] Implement a local-vs-leaderboard divergence check (in `evaluation/run_batch.py` or a small `evaluation/divergence.py` helper) that compares a submission's local win-rate against its recorded leaderboard result once known, and flags a warning per spec's Edge Cases when they disagree sharply
-- [ ] T020 [US2] Implement a second strategy iteration in `src/kaggriculture_agent/strategy.py`: improve crop/animal prioritization and market-timing/batching of sells based on `evaluation/run_batch.py` results against the `greedy` and `previous` opponents (depends on T011, T018)
-- [ ] T021 [US2] Record the iteration's hypothesis, evaluation results, and adopt/reject/investigate decision as a new `ExperimentLogEntry` in `experiments/log.jsonl` (depends on T020)
+- [X] T018 [US2] Extend `evaluation/run_batch.py` to support a `previous` opponent that loads the most recent `submissions/<version>/main.py` (depends on T008, T013)
+- [X] T019 [US2] Implement a local-vs-leaderboard divergence check (in `evaluation/run_batch.py` or a small `evaluation/divergence.py` helper) that compares a submission's local win-rate against its recorded leaderboard result once known, and flags a warning per spec's Edge Cases when they disagree sharply
+- [X] T020 [US2] Implement a second strategy iteration in `src/kaggriculture_agent/strategy.py`: improve crop/animal prioritization and market-timing/batching of sells based on `evaluation/run_batch.py` results against the `greedy` and `previous` opponents (depends on T011, T018)
+- [X] T021 [US2] Record the iteration's hypothesis, evaluation results, and adopt/reject/investigate decision as a new `ExperimentLogEntry` in `experiments/log.jsonl` (depends on T020)
 
 **Checkpoint**: User Stories 1 AND 2 both work — strategies can now be iterated with a trustworthy local signal, self-play comparison, and a full experiment history.
 
