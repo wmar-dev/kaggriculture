@@ -26,12 +26,18 @@ PACKAGE_DIR = REPO_ROOT / "src" / "kaggriculture_agent"
 MODULE_ORDER = ["constants.py", "observation.py", "strategy.py", "agent.py"]
 
 _FUTURE_IMPORT_RE = re.compile(r"^from __future__ import annotations\s*$", re.MULTILINE)
-_LOCAL_IMPORT_RE = re.compile(r"^from kaggriculture_agent\.\w+ import .+$", re.MULTILINE)
+# Two forms: a parenthesized (possibly multi-line) import list, and a
+# plain single-line import -- matched separately because a single regex
+# spanning both with re.DOTALL would also swallow unrelated code between
+# two single-line imports.
+_LOCAL_IMPORT_MULTILINE_RE = re.compile(r"^from kaggriculture_agent\.\w+ import \([^)]*\)\s*$", re.MULTILINE | re.DOTALL)
+_LOCAL_IMPORT_SINGLELINE_RE = re.compile(r"^from kaggriculture_agent\.\w+ import (?!\().+$", re.MULTILINE)
 
 
 def _strip_module(source: str) -> str:
     source = _FUTURE_IMPORT_RE.sub("", source)
-    source = _LOCAL_IMPORT_RE.sub("", source)
+    source = _LOCAL_IMPORT_MULTILINE_RE.sub("", source)
+    source = _LOCAL_IMPORT_SINGLELINE_RE.sub("", source)
     return source.strip("\n")
 
 

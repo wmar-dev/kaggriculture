@@ -79,6 +79,16 @@ class GameObservation:
     def unlocked_quadrants(self) -> list[str]:
         return self.my_farm.get("unlocked_quadrants", []) or []
 
+    def hand_inventory(self, hand_index: int) -> dict:
+        """`hand_index` is 0-based over hands (not counting the farmer)."""
+        idx = hand_index + 1  # inventories[0] is the farmer's
+        if idx < len(self.inventories):
+            return self.inventories[idx] or {}
+        return {}
+
+    def farmer_inventory(self) -> dict:
+        return self.inventories[0] if self.inventories else {}
+
 
 def parse_observation(obs: dict) -> GameObservation:
     """Parse the raw `obs` dict into a `GameObservation`.

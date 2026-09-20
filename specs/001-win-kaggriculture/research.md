@@ -118,6 +118,65 @@ but self-inflicted price crashes from selling accumulated stock in one
 shot; batching sells is a stronger lead for a v3 iteration than adding
 entirely new mechanics (animals, fertilizing) would be.
 
+## v3: animal husbandry, prompted by v2's real Kaggle result
+
+**Trigger**: v2 was submitted to Kaggle for real (submission ref
+`56386069`) and scored a public leaderboard `public_score` of **389.9**,
+while the field's scores clustered around **2900-3300**. This is exactly
+the local/leaderboard divergence scenario the spec's Edge Cases and
+constitution Principle II anticipated -- 100% local win rate did not
+predict competitive standing at all, and per Principle II that divergence
+had to be investigated before any further local-only tuning.
+
+**Investigation**: downloaded and inspected the actual episode replays
+(`kaggle competitions episodes` / `replay`) rather than guessing. All
+three played episodes completed cleanly (`status: DONE`, no crash/timeout
+-- so the gap was a strategy gap, not a bug in submission handling). The
+worst loss: our agent scored 4,531 money; the opponent scored **132,021**.
+Inspecting that opponent's final farm composition directly from the
+replay JSON showed 12 COW pastures, 3 SHEEP pastures, and 8 hired hands
+-- vs. our zero animals. Crops have a hard yield cap; animals (per
+CONTEST.md) produce indefinitely as long as fed, which is the likely
+source of that scale of return.
+
+**Implementation**: added a dedicated animal-husbandry loop for hired
+hands (build a PASTURE, buy/PICKUP/PLACE a COW, then FEED/CARE/HARVEST
+daily, restocking WHEAT and COWs from the shed as needed), while the
+farmer keeps doing exactly what it did in v2. Getting this working
+surfaced three more real bugs, each found by testing against the actual
+engine rather than assumption, the same way the harvest-timing and
+last-callable bugs were found for v1/v2:
+
+1. The existing "sell everything in the shed" loop didn't check whether
+   an item was an actual priced product -- it sold a freshly bought COW
+   right back out of the shed before a hand could ever pick it up.
+2. `HIRE` was only ever queued once per day (a single `if`, not a loop)
+   despite `hires_today < HIRE_TARGET` intending to allow several --
+   hiring never scaled past 1 hand/day.
+3. Even after (2) was fixed, hands at the shed always preferred picking
+   up a *new* COW (to keep progressing toward the structure target) over
+   picking up WHEAT for animals that were already hungry -- so every
+   animal we placed starved after 2 unfed days and escaped
+   (unrecoverable), for nothing. Feeding existing animals now strictly
+   outranks acquiring new ones.
+4. Even with all three fixed, targeting the opponent's *end-state* scale
+   directly (10 structures, 6 hands) overextended the starting $3,000
+   across land + animals + aggressive hiring simultaneously and stalled
+   the economy for most of the 30-day season. Scaling the target down to
+   3 structures / 3 hands (validate the mechanic at a size the starting
+   budget can actually sustain, per constitution Principle V) immediately
+   turned a losing run into a strongly winning, compounding one.
+
+**Outcome**: `evaluation/run_batch.py` (12 seasons/opponent) shows v3 at
+100% win rate vs random/starter/greedy and vs v2 in direct self-play, at
+roughly **3x v2's average final money** (~18-19k vs ~6-6.6k). v3 is
+marked as the final selection in `experiments/log.jsonl`, pending a real
+Kaggle submission to close the loop on whether it also closes the
+local/leaderboard gap that started this investigation. A natural v4 would
+raise `TARGET_STRUCTURES`/`HIRE_TARGET` again now that the mechanic is
+proven, but staged incrementally this time rather than jumping straight
+to a large target.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

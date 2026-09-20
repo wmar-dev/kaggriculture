@@ -100,6 +100,14 @@ BUY_LAND_COSTS: list[int] = [1000, 2000, 4000]
 FARMER_MOVE_OPS: list[str] = ["NORTH", "SOUTH", "EAST", "WEST"]
 
 
+def shed_tiles(board_size: int) -> list[tuple[int, int]]:
+    """The four board tiles orthogonally adjacent to the shed (CONTEST.md):
+    (half-1,half-1), (half,half-1), (half-1,half), (half,half) for
+    half = board_size // 2. The shed itself is never a tile."""
+    half = board_size // 2
+    return [(half - 1, half - 1), (half, half - 1), (half - 1, half), (half, half)]
+
+
 def yield_per_tile_per_day(crop: str) -> float:
     """Total units harvested per day the tile is occupied, watering daily,
     no fertilizer -- matches the "Yield / tile / day" column in CONTEST.md.
