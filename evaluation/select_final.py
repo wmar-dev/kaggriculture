@@ -42,16 +42,40 @@ def _latest_per_version(entries: list[dict]) -> list[dict]:
     return list(latest.values())
 
 
+def _avg_money_margin(entry: dict) -> float:
+    """Mean (our final money - opponent's) across this version's
+    evaluation_results -- a tiebreaker for when two candidates both show
+    a 100% local win-rate but by very different margins (exactly what
+    happened comparing v2 and v3)."""
+    results = entry.get("evaluation_results") or []
+    if not results:
+        return 0.0
+    margins = [r.get("mean_money", 0) - r.get("opponent_mean_money", 0) for r in results]
+    return sum(margins) / len(margins)
+
+
 def _sort_key(entry: dict) -> tuple:
-    has_leaderboard = entry.get("kaggle_result") is not None
-    public_score = entry["kaggle_result"]["public_score"] if has_leaderboard else 0
-    return (has_leaderboard, public_score, average_win_rate(entry))
+    return (average_win_rate(entry), _avg_money_margin(entry))
 
 
 def rank_candidates(entries: list[dict]) -> list[dict]:
-    """Best candidate first: real leaderboard evidence outranks local-only
-    evidence (regardless of local win-rate), then by leaderboard score,
-    then by local win-rate."""
+    """Best candidate first, ranked by local win-rate then by average
+    money margin.
+
+    Earlier versions of this ranking put ANY candidate with a real
+    Kaggle `kaggle_result` ahead of every local-only candidate, no matter
+    how much better the local-only one looked. That is wrong whenever a
+    newer version was built specifically in response to an older
+    version's weak leaderboard result (exactly what happened between v2,
+    which scored a real public_score of 389.9, and v3, which was written
+    to fix the gap that exposed) -- it kept recommending re-submitting
+    the known-weak v2 instead of the untried, locally-dominant v3. Local
+    evidence is meant to be trustworthy (constitution Principle II); a
+    stale real number for an OLDER, superseded candidate shouldn't
+    override that. `format_recommendation` still surfaces each
+    candidate's `kaggle_result` when one exists, as context for the
+    competitor's own judgment.
+    """
     candidates = _latest_per_version(entries)
     return sorted(candidates, key=_sort_key, reverse=True)
 
@@ -60,13 +84,13 @@ def format_recommendation(entry: dict) -> str:
     has_leaderboard = entry.get("kaggle_result") is not None
     local = average_win_rate(entry)
     lines = [f"Recommended final: {entry['agent_version']} (commit {entry.get('commit_sha', '?')[:8]})"]
-    if has_leaderboard:
-        lines.append(f"  Leaderboard public_score: {entry['kaggle_result']['public_score']}")
     lines.append(f"  Local avg win-rate: {local:.0%} across {len(entry.get('evaluation_results') or [])} opponent(s)")
     for r in entry.get("evaluation_results") or []:
         lines.append(f"    vs {r['opponent']}: {r['wins']}W/{r['losses']}L/{r['ties']}T (win_rate={r['win_rate']:.0%})")
-    if not has_leaderboard:
-        lines.append("  NOTE: no leaderboard result recorded yet for this version -- this recommendation is local-evidence only.")
+    if has_leaderboard:
+        lines.append(f"  This version's own recorded leaderboard public_score: {entry['kaggle_result']['public_score']}")
+    else:
+        lines.append("  NOTE: this version has not been submitted to Kaggle yet -- this recommendation is local-evidence only.")
     return "\n".join(lines)
 
 

@@ -11,30 +11,47 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "evaluati
 import select_final  # noqa: E402
 
 
-def _entry(version, win_rate, public_score=None, evaluation_results=True):
+def _entry(version, win_rate, public_score=None, evaluation_results=True, mean_money=0, opponent_mean_money=0):
     entry = {
         "agent_version": version,
         "commit_sha": f"sha-{version}",
-        "evaluation_results": [{"opponent": "starter", "wins": 1, "losses": 0, "ties": 0, "win_rate": win_rate}] if evaluation_results else [],
+        "evaluation_results": [
+            {
+                "opponent": "starter",
+                "wins": 1,
+                "losses": 0,
+                "ties": 0,
+                "win_rate": win_rate,
+                "mean_money": mean_money,
+                "opponent_mean_money": opponent_mean_money,
+            }
+        ]
+        if evaluation_results
+        else [],
         "kaggle_result": {"public_score": public_score} if public_score is not None else None,
         "decision": "investigate",
     }
     return entry
 
 
-def test_rank_candidates_prefers_leaderboard_evidence_over_higher_local_win_rate():
+def test_rank_candidates_prefers_higher_local_win_rate_even_over_leaderboard_evidence():
+    """Regression test: an earlier version of this ranking put ANY
+    candidate with a real kaggle_result ahead of every local-only
+    candidate regardless of local win-rate. That's exactly the bug that
+    made `make submit` keep recommending a known-weak, already-submitted
+    v2 (public_score=389.9) over a locally-dominant, unsubmitted v3."""
     entries = [
         _entry("v1", win_rate=0.5, public_score=1000),
-        _entry("v2", win_rate=0.95, public_score=None),  # better local, but never actually submitted
+        _entry("v2", win_rate=0.95, public_score=None),  # better local, never actually submitted
     ]
     ranked = select_final.rank_candidates(entries)
-    assert ranked[0]["agent_version"] == "v1"
+    assert ranked[0]["agent_version"] == "v2"
 
 
-def test_rank_candidates_orders_by_public_score_when_both_have_leaderboard_results():
+def test_rank_candidates_breaks_win_rate_ties_by_average_money_margin():
     entries = [
-        _entry("v1", win_rate=0.5, public_score=1000),
-        _entry("v2", win_rate=0.5, public_score=2000),
+        _entry("v1", win_rate=1.0, mean_money=6000, opponent_mean_money=3000),  # margin 3000
+        _entry("v2", win_rate=1.0, mean_money=18000, opponent_mean_money=3000),  # margin 15000
     ]
     ranked = select_final.rank_candidates(entries)
     assert [e["agent_version"] for e in ranked] == ["v2", "v1"]
