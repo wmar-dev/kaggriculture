@@ -105,12 +105,12 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 ### Tests for User Story 3
 
-- [ ] T022 [P] [US3] Unit test for the final-selection ranking logic in `tests/unit/test_select_final.py` (ranks by local score, then leaderboard score when present; handles ties and missing data)
+- [X] T022 [P] [US3] Unit test for the final-selection ranking logic in `tests/unit/test_select_final.py` (ranks by local score, then leaderboard score when present; handles ties and missing data)
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implement `evaluation/select_final.py`: reads `experiments/log.jsonl`, ranks candidate submissions by local evaluation result (and leaderboard result when known), and prints the recommended final submission(s) with supporting rationale (depends on T008, T021)
-- [ ] T024 [US3] Add a `mark_final` helper (in `evaluation/select_final.py`) that updates the chosen entry's `decision` field to `"adopt"` and flags it as the final selection in `experiments/log.jsonl`, to be invoked only after the competitor's own review (depends on T023)
+- [X] T023 [US3] Implement `evaluation/select_final.py`: reads `experiments/log.jsonl`, ranks candidate submissions by local evaluation result (and leaderboard result when known), and prints the recommended final submission(s) with supporting rationale (depends on T008, T021)
+- [X] T024 [US3] Add a `mark_final` helper (in `evaluation/select_final.py`) that updates the chosen entry's `decision` field to `"adopt"` and flags it as the final selection in `experiments/log.jsonl`, to be invoked only after the competitor's own review (depends on T023)
 
 **Checkpoint**: All user stories are independently functional — baseline, validated iteration, and deliberate final selection.
 
@@ -120,9 +120,9 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T025 [P] Write a short `README.md` pointing at `specs/001-win-kaggriculture/quickstart.md` for how to run/evaluate/bundle the agent
-- [ ] T026 Run the full quickstart.md validation end-to-end (steps 1–4) after all user stories are implemented, confirming nothing regressed
-- [ ] T027 [P] Add a per-turn timing assertion to `tests/integration/test_agent_contract.py` confirming the agent's decision time stays within research.md R1's internal ≤50ms budget
+- [X] T025 [P] Write a short `README.md` pointing at `specs/001-win-kaggriculture/quickstart.md` for how to run/evaluate/bundle the agent
+- [X] T026 Run the full quickstart.md validation end-to-end (steps 1–4) after all user stories are implemented, confirming nothing regressed
+- [X] T027 [P] Add a per-turn timing assertion to `tests/integration/test_agent_contract.py` confirming the agent's decision time stays within research.md R1's internal ≤50ms budget
 
 ---
 

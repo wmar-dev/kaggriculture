@@ -103,3 +103,34 @@ def test_agent_bounds_market_orders_to_the_configured_limit():
     obs["private"]["shed"] = {f"ITEM_{i}": 1 for i in range(20)}
     action = agent(obs)
     assert len(action["market"]) <= DEFAULT_CONFIG["maxMarketOrdersPerTurn"]
+
+
+def test_agent_stays_within_internal_per_turn_time_budget():
+    """research.md R1: designed against an internal <=50ms/turn budget,
+    a large safety margin under the confirmed real actTimeout of 1s.
+    Measured across a real (short) episode, not synthetic obs, so board
+    scans (e.g. _find_nearest_tile) run against a realistically populated
+    farm rather than an empty one.
+    """
+    import time
+
+    from kaggriculture_agent.constants import INTERNAL_TURN_BUDGET_SECONDS
+
+    env = make("kaggriculture", configuration={"episodeSteps": 48})
+    env.reset()
+    durations = []
+    for _ in range(48):
+        obs = env.state[0].observation
+        start = time.perf_counter()
+        action = agent(obs)
+        durations.append(time.perf_counter() - start)
+        if env.done:
+            break
+        # env.step() takes literal actions for both agents (unlike env.run(),
+        # it does not resolve "random" as a named agent) -- the opponent's
+        # own play doesn't matter for this timing test, so it just PASSes.
+        env.step([action, {"farmer": ["PASS"], "hands": [], "market": []}])
+    assert max(durations) < INTERNAL_TURN_BUDGET_SECONDS, (
+        f"slowest turn took {max(durations) * 1000:.1f}ms, "
+        f"over the {INTERNAL_TURN_BUDGET_SECONDS * 1000:.0f}ms internal budget"
+    )
