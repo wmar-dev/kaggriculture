@@ -161,16 +161,22 @@ that this choice is backed by recorded validation/leaderboard evidence.
   mechanism (e.g., rating system across many matches) are not yet
   confirmed from the live competition page; treat the timeline in
   Assumptions as provisional until confirmed.
-- **FR-010**: Kaggle submissions MUST be uploaded via
-  [NEEDS CLARIFICATION: should submissions be uploaded automatically
-  (e.g., via the Kaggle API, using the competitor's stored credentials) or
-  should each submission require the competitor's explicit review/approval
-  before it is sent to Kaggle?].
-- **FR-011**: "Winning" for this effort is defined as
-  [NEEDS CLARIFICATION: which outcome counts as success — first place,
-  any medal position (commonly top ~10% of a large competition), a
-  specific score/rank threshold, or simply the best rank reasonably
-  achievable by the deadline?].
+- **FR-010**: Every upload of an agent to Kaggle (the actual submission
+  action, spending submission budget) MUST require the competitor's
+  explicit review/approval before it is sent — it MUST NOT be performed
+  automatically without that approval. Building, local evaluation, and
+  preparing a ready-to-submit agent file MAY proceed without per-step
+  approval. *(Resolved per project constitution Principle VI: a Kaggle
+  submission is an irreversible, credentialed, budget-spending action, one
+  of the principle's explicit exceptions to autonomous decision-making.)*
+- **FR-011**: "Winning" for this effort is defined as achieving the best
+  leaderboard rank reasonably achievable by the competitor's own agent
+  before the deadline — there is no fixed rank/medal/score threshold below
+  which the effort is considered a failure; work continues to improve
+  standing for as long as the deadline allows. *(Resolved per project
+  constitution Principle VI: no user-specified target was given, so the
+  open-ended, always-keep-improving default was chosen — the interpretation
+  most aligned with Principle I, Leaderboard-Driven Iteration.)*
 
 ### Key Entities
 
@@ -210,9 +216,11 @@ that this choice is backed by recorded validation/leaderboard evidence.
 - **SC-005**: A final submission is deliberately selected and confirmed no
   later than the competition deadline, with recorded evidence for why it
   was chosen over the alternatives.
-- **SC-006**: The competition is closed out at or above the success
-  threshold defined by the resolution of FR-011 (final rank/medal/score
-  target), measured against the private leaderboard once released.
+- **SC-006**: At the moment the competition closes, the competitor's final
+  rank is the best rank the recorded experiment history can support (i.e.,
+  no known, already-validated improvement was left unsubmitted due to
+  process failure rather than genuine time/submission-budget constraints),
+  measured against the private leaderboard once released.
 
 ## Assumptions
 
