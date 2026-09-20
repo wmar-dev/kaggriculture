@@ -28,9 +28,9 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directories per plan.md: `src/kaggriculture_agent/`, `evaluation/opponents/`, `tests/unit/`, `tests/integration/`, `experiments/`, `submissions/` (with `__init__.py` where needed for `src/kaggriculture_agent/`)
-- [ ] T002 Initialize Python project dependencies in `pyproject.toml` (or `requirements.txt`): `kaggle_environments`, `numpy`, `pytest` (per plan.md Technical Context)
-- [ ] T003 [P] Add `pytest` configuration (`pyproject.toml` `[tool.pytest.ini_options]` or `pytest.ini`) pointing at `tests/`, and add `experiments/`, `submissions/`, `__pycache__/`, `.pytest_cache/` entries to `.gitignore` where appropriate (note: `experiments/log.jsonl` and `submissions/<version>/agent.py` themselves ARE committed per constitution Principle III — only caches/build noise are ignored)
+- [X] T001 Create project directories per plan.md: `src/kaggriculture_agent/`, `evaluation/opponents/`, `tests/unit/`, `tests/integration/`, `experiments/`, `submissions/` (with `__init__.py` where needed for `src/kaggriculture_agent/`)
+- [X] T002 Initialize Python project dependencies in `pyproject.toml` (or `requirements.txt`): `kaggle_environments`, `numpy`, `pytest` (per plan.md Technical Context)
+- [X] T003 [P] Add `pytest` configuration (`pyproject.toml` `[tool.pytest.ini_options]` or `pytest.ini`) pointing at `tests/`, and add `experiments/`, `submissions/`, `__pycache__/`, `.pytest_cache/` entries to `.gitignore` where appropriate (note: `experiments/log.jsonl` and `submissions/<version>/main.py` themselves ARE committed per constitution Principle III — only caches/build noise are ignored)
 
 **Checkpoint**: Project scaffold exists and dependencies are declared.
 
@@ -42,11 +42,11 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] Implement observation parsing in `src/kaggriculture_agent/observation.py`: typed accessors for `GameObservation`/`FarmState`/`Tile`/`MarketState`/`TownState`/`PrivateState` per data-model.md, parsing the raw `obs` dict from `CONTEST.md`'s Observation Format
-- [ ] T005 [P] Implement `src/kaggriculture_agent/constants.py`: the Object Types table (seed cost, base price, yield timing per crop/animal), the Price Function parameters table, and configuration defaults, transcribed from `CONTEST.md`
-- [ ] T006 Implement the agent entry point skeleton in `src/kaggriculture_agent/agent.py`: `def agent(obs, config) -> dict` matching contracts/agent-interface.md, parsing `obs` via T004, delegating to a pluggable strategy function, defaulting to `{"farmer": ["PASS"]}` when no strategy is wired in yet (depends on T004)
-- [ ] T007 [P] Implement reference opponents for local evaluation in `evaluation/opponents/random_agent.py` (legal-random actions) and `evaluation/opponents/greedy_agent.py` (always plant/raise the best current `Yield/tile/day` × price option that's affordable, sell opportunistically) per research.md R3
-- [ ] T008 [P] Implement the local batch-evaluation harness in `evaluation/run_batch.py`: run N seasons of a given agent vs. a named opponent via `kaggle_environments.make("kaggriculture", ...)`, report win/loss/tie counts and mean/median end-of-season money, and append an `ExperimentLogEntry` (per data-model.md) to `experiments/log.jsonl`
+- [X] T004 [P] Implement observation parsing in `src/kaggriculture_agent/observation.py`: typed accessors for `GameObservation`/`FarmState`/`Tile`/`MarketState`/`TownState`/`PrivateState` per data-model.md, parsing the raw `obs` dict from `CONTEST.md`'s Observation Format
+- [X] T005 [P] Implement `src/kaggriculture_agent/constants.py`: the Object Types table (seed cost, base price, yield timing per crop/animal), the Price Function parameters table, and configuration defaults, transcribed from `CONTEST.md`
+- [X] T006 Implement the agent entry point skeleton in `src/kaggriculture_agent/agent.py`: `def agent(obs) -> dict` matching contracts/agent-interface.md, parsing `obs` via T004, delegating to a pluggable strategy function, defaulting to `{"farmer": ["PASS"], "hands": [], "market": []}` when no strategy is wired in yet (depends on T004)
+- [X] T007 [P] Implement one custom reference opponent for local evaluation in `evaluation/opponents/greedy_agent.py` (always plant/raise the best current `Yield/tile/day` × price option that's affordable, sell opportunistically) per research.md R3 — the `"random"` and `"starter"` opponents are already built into `kaggle_environments` and addressable by name, no custom file needed for those
+- [X] T008 [P] Implement the local batch-evaluation harness in `evaluation/run_batch.py`: run N seasons of a given agent vs. a named opponent via `kaggle_environments.make("kaggriculture", ...)`, report win/loss/tie counts and mean/median end-of-season money, and append an `ExperimentLogEntry` (per data-model.md) to `experiments/log.jsonl`
 
 **Checkpoint**: Foundation ready — user story implementation can now begin.
 
@@ -60,16 +60,16 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Contract tests in `tests/integration/test_agent_contract.py`: full-episode smoke test (agent vs. `random` completes all `episodeSteps` with no exception/illegal-action/timeout), never-empty response, bounded market orders — per contracts/agent-interface.md's three acceptance tests
-- [ ] T010 [P] [US1] Unit tests for observation parsing in `tests/unit/test_observation.py` (covers Tile variants: `None`, `"LOCKED"`, plant, weed, animal structure)
+- [X] T009 [P] [US1] Contract tests in `tests/integration/test_agent_contract.py`: full-episode smoke test (agent vs. `random` completes all `episodeSteps` with no exception/illegal-action/timeout), never-empty response, bounded market orders — per contracts/agent-interface.md's three acceptance tests
+- [X] T010 [P] [US1] Unit tests for observation parsing in `tests/unit/test_observation.py` (covers Tile variants: `None`, `"LOCKED"`, plant, weed, animal structure)
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Implement the baseline rule-based strategy in `src/kaggriculture_agent/strategy.py` per research.md R4: prioritize land/labor purchases only with clear affordable ROI, plant/raise the best current `Yield/tile/day` × market-price option that fits the budget, always water/feed/care for everything owned, sell opportunistically without crashing a single good's price (depends on T004, T005)
-- [ ] T012 [US1] Wire the strategy into `src/kaggriculture_agent/agent.py`'s entry point, replacing the default PASS-only behavior (depends on T006, T011)
-- [ ] T013 [US1] Implement `evaluation/bundle_submission.py`: inline/concatenate `src/kaggriculture_agent/` modules into a single self-contained `submissions/<version>/agent.py` with one `agent(obs, config)` entry point and no local imports, per research.md R2
-- [ ] T014 [US1] Run quickstart.md steps 1–4 against the baseline strategy; record the resulting `ExperimentLogEntry` in `experiments/log.jsonl` (depends on T008, T012, T013)
-- [ ] T015 [US1] Produce `submissions/v1/agent.py` as the first submission candidate, ready for human review/upload — actually uploading to Kaggle is a separate, human-approved action per spec FR-010 and is out of scope for this task (depends on T013, T014)
+- [X] T011 [US1] Implement the baseline rule-based strategy in `src/kaggriculture_agent/strategy.py` per research.md R4: prioritize land/labor purchases only with clear affordable ROI, plant/raise the best current `Yield/tile/day` × market-price option that fits the budget, always water/feed/care for everything owned, sell opportunistically without crashing a single good's price (depends on T004, T005)
+- [X] T012 [US1] Wire the strategy into `src/kaggriculture_agent/agent.py`'s entry point, replacing the default PASS-only behavior (depends on T006, T011)
+- [X] T013 [US1] Implement `evaluation/bundle_submission.py`: inline/concatenate `src/kaggriculture_agent/` modules into a single self-contained `submissions/<version>/main.py` with one `agent(obs)` entry point and no local imports, per research.md R2
+- [X] T014 [US1] Run quickstart.md steps 1–4 against the baseline strategy; record the resulting `ExperimentLogEntry` in `experiments/log.jsonl` (depends on T008, T012, T013)
+- [X] T015 [US1] Produce `submissions/v1/main.py` as the first submission candidate, ready for human review/upload — actually uploading to Kaggle is a separate, human-approved action per spec FR-010 and is out of scope for this task (depends on T013, T014)
 
 **Checkpoint**: User Story 1 is fully functional and independently testable — a valid baseline agent exists and is ready for the competitor to review and submit.
 
@@ -84,11 +84,11 @@ Single project, per plan.md: `src/kaggriculture_agent/`, `evaluation/`, `tests/`
 ### Tests for User Story 2
 
 - [ ] T016 [P] [US2] Unit tests for batch-evaluation aggregation/statistics in `tests/unit/test_run_batch.py` (win/loss/tie counting, mean/median money calculation)
-- [ ] T017 [P] [US2] Integration test for self-play comparison in `tests/integration/test_self_play.py`: evaluating a candidate strategy against a frozen `submissions/v1/agent.py` copy as the `previous` opponent
+- [ ] T017 [P] [US2] Integration test for self-play comparison in `tests/integration/test_self_play.py`: evaluating a candidate strategy against a frozen `submissions/v1/main.py` copy as the `previous` opponent
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Extend `evaluation/run_batch.py` to support a `previous` opponent that loads the most recent `submissions/<version>/agent.py` (depends on T008, T013)
+- [ ] T018 [US2] Extend `evaluation/run_batch.py` to support a `previous` opponent that loads the most recent `submissions/<version>/main.py` (depends on T008, T013)
 - [ ] T019 [US2] Implement a local-vs-leaderboard divergence check (in `evaluation/run_batch.py` or a small `evaluation/divergence.py` helper) that compares a submission's local win-rate against its recorded leaderboard result once known, and flags a warning per spec's Edge Cases when they disagree sharply
 - [ ] T020 [US2] Implement a second strategy iteration in `src/kaggriculture_agent/strategy.py`: improve crop/animal prioritization and market-timing/batching of sells based on `evaluation/run_batch.py` results against the `greedy` and `previous` opponents (depends on T011, T018)
 - [ ] T021 [US2] Record the iteration's hypothesis, evaluation results, and adopt/reject/investigate decision as a new `ExperimentLogEntry` in `experiments/log.jsonl` (depends on T020)
@@ -172,7 +172,7 @@ Task: "Unit tests for observation parsing in tests/unit/test_observation.py"
 2. Complete Phase 2: Foundational
 3. Complete Phase 3: User Story 1
 4. **STOP and VALIDATE**: run quickstart.md steps 1–4; confirm the contract tests pass
-5. Prepare `submissions/v1/agent.py` for the competitor's review and first Kaggle upload (human-approved step, FR-010)
+5. Prepare `submissions/v1/main.py` for the competitor's review and first Kaggle upload (human-approved step, FR-010)
 
 ### Incremental Delivery
 

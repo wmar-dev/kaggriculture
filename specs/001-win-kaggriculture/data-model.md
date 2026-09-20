@@ -73,7 +73,7 @@ A tagged union, per `CONTEST.md`'s Observation Format:
 
 ## Strategy-layer entities (this implementation's own design, not part of the wire contract)
 
-- **AgentVersion**: a named, git-committed snapshot of `src/kaggriculture_agent/` plus the bundled `submissions/<version>/agent.py` it produces. Maps directly to spec's "Agent" entity.
+- **AgentVersion**: a named, git-committed snapshot of `src/kaggriculture_agent/` plus the bundled `submissions/<version>/main.py` it produces. Maps directly to spec's "Agent" entity.
 - **EvaluationResult**: output of one local batch run — opponent name, seasons played, win/loss/tie counts, mean/median end-of-season money for both sides. Maps to spec's "Match / Episode" aggregate.
 - **ExperimentLogEntry** (`experiments/log.jsonl`, one JSON object per line): `{timestamp, agent_version, commit_sha, hypothesis, evaluation_results: EvaluationResult[], kaggle_result: {submitted_at, public_score, rank} | null, decision: "adopt" | "reject" | "investigate"}`. Maps to spec's "Experiment Log" entity and satisfies FR-003/FR-008.
 - **CompetitionRuleset**: the fixed, non-code facts governing what's legal — `CONTEST.md`'s game mechanics plus Kaggle's own competition rules (submission caps, deadline, team rules). Not stored as application data; referenced as documentation (`CONTEST.md`, and once confirmed, the Kaggle rules page) per spec's "Competition Ruleset" entity.

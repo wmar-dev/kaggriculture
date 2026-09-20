@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+
+# OS
+.DS_Store
+
+# Agent folders (may hold credentials/tokens)
+.claude/

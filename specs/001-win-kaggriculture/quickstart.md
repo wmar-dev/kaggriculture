@@ -6,8 +6,10 @@ being validated and `data-model.md` for the shapes involved.
 
 ## Prerequisites
 
-- Python 3.11
-- `pip install kaggle_environments pytest numpy`
+- Python 3.11+ (this environment: a local `.venv/` at the repo root)
+- `pip install -e .` (installs `kaggle-environments`, `numpy`, and the
+  `kaggriculture_agent` package itself in editable mode); `pip install -e ".[dev]"`
+  additionally installs `pytest`
 - Repository checked out on branch `001-win-kaggriculture`
 
 ## 1. Run a single episode and render it
@@ -18,11 +20,11 @@ season against a reference opponent (contract test 1).
 ```bash
 python -c "
 from kaggle_environments import make
-from src.kaggriculture_agent.agent import agent as my_agent
+from kaggriculture_agent.agent import agent as my_agent
 
 env = make('kaggriculture', configuration={'episodeSteps': 720})
 env.run([my_agent, 'random'])
-print('Final money:', [f['money'] for f in env.state[-1].observation.farms])
+print('Final money:', [f['money'] for f in env.steps[-1][0].observation.farms])
 "
 ```
 
@@ -61,8 +63,8 @@ end-of-season money per opponent, and a new line appended to
 Proves the single-file packaging approach from `research.md` R2.
 
 ```bash
-python evaluation/bundle_submission.py --out submissions/<version>/agent.py
-python -c "import ast; ast.parse(open('submissions/<version>/agent.py').read())"
+python evaluation/bundle_submission.py --out submissions/<version>/main.py
+python -c "import ast; ast.parse(open('submissions/<version>/main.py').read())"
 ```
 
 **Expected outcome**: a single `agent.py` with no local imports that
@@ -73,6 +75,6 @@ behaves identically to the unbundled agent.
 
 Per spec FR-010, this step always requires the competitor's own review
 and action; it is intentionally not scripted end-to-end here. Once
-`submissions/<version>/agent.py` has passed steps 1–4 and shown a
+`submissions/<version>/main.py` has passed steps 1–4 and shown a
 favorable result in step 3, the competitor reviews it and uploads it to
 the competition themselves (or explicitly approves an upload).

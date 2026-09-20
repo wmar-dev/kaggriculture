@@ -1,27 +1,40 @@
 # Contract: Kaggle Simulations Agent Interface
 
-This is the external interface the submitted `submissions/<version>/agent.py`
+This is the external interface the submitted `submissions/<version>/main.py`
 must implement — the only "contract" this project exposes, since it is a
 single-file Kaggle Simulations submission, not a service with an API.
-Source of truth for the shapes below is `CONTEST.md`; this file restates
-them as an explicit input/output contract for implementation and testing.
+Source of truth for the shapes below is the real, installed
+`kaggle_environments` package's `kaggriculture` environment
+(`kaggriculture.json`, `kaggriculture.py`, `AGENTS.md`) — confirmed
+byte-identical in its game-rules prose to the competitor-supplied
+`CONTEST.md` — per `research.md` R1.
 
 ## Entry point
 
 ```python
-def agent(obs: dict, config: dict) -> dict:
+def agent(obs: dict) -> dict:
     """Return this player's actions for the current turn."""
 ```
 
-- Called once per turn (`episodeSteps`, default 720; 24 turns/day × 30
+- Single-argument form, matching every built-in reference agent
+  (`pass_agent`, `random_agent`, `starter_agent`) and the `AGENTS.md`
+  example. The framework actually supports either `agent(obs)` or
+  `agent(obs, config)` (it inspects `co_argcount` and truncates its call
+  args to match), but the single-arg form is the demonstrated convention
+  and is what this project uses.
+- Called once per turn (`episodeSteps`, default 720; `turnsPerDay` × 30
   days) by the `kaggle_environments` runner, alternating/concurrent with
   the opponent's own `agent` call.
-- MUST return within the per-turn time budget (see
-  `research.md` R1 — TODO(TURN_TIME_LIMIT) pending confirmation; designed
-  against an internal ≤50ms target).
+- MUST return within `actTimeout` (confirmed: **1 second** per turn), with
+  a shared `remainingOverageTime` budget of **60 seconds** for the whole
+  episode (`kaggriculture.json`). Designed against a much tighter internal
+  ≤50ms target for a large safety margin (`research.md` R1).
 - MUST NOT raise, hang, or import anything unavailable in Kaggle's sandbox
   (no local package imports beyond the standard library once bundled — see
-  `research.md` R2).
+  `research.md` R2). Kaggle's actual required filename for a single-file
+  submission is `main.py` at the archive/repo root (`AGENTS.md`); this
+  project's `submissions/<version>/` bundling step must produce a file
+  named `main.py`.
 
 ## Input: `obs`
 
@@ -31,6 +44,7 @@ for the parsed/typed view. Top-level shape:
 ```python
 {
   "player": int,           # 0 or 1
+  "step":   int,           # current turn, 0-indexed, supplied by the kaggle_environments framework
   "day":    int,
   "hour":   int,
   "farms":  [farm, farm],  # public, indexed by player id

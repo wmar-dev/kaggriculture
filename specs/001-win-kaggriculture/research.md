@@ -1,33 +1,35 @@
 # Phase 0 Research: Win Kaggriculture Competition
 
-## R1: Per-turn / per-episode time limit
+## R1: Per-turn / per-episode time limit — RESOLVED (confirmed from source)
 
-**Unknown**: Kaggle Simulations competitions enforce a compute time budget
-per agent per turn (and often a cumulative "overage" budget per episode).
-`CONTEST.md` does not state Kaggriculture's specific limits, and the live
-competition page could not be fetched automatically (client-rendered /
-requires a logged-in session).
+**Update**: `kaggle_environments` (PyPI `kaggle-environments==1.32.7`)
+actually bundles a working `kaggriculture` environment
+(`kaggle_environments/envs/kaggriculture/`), including `kaggriculture.py`
+(the real engine, 1086 lines), `kaggriculture.json` (the real
+configuration schema), `README.md` (byte-identical to the competitor's
+`CONTEST.md`), and `AGENTS.md` (a submission how-to guide). This resolves
+the unknown directly from ground truth instead of needing a conservative
+guess.
 
-- **Decision**: Design and test the agent against a conservative internal
-  budget of **≤50ms per turn** on this development machine, with a hard
-  internal guard that always returns a legal (possibly `PASS`-heavy)
-  action set well before any plausible Kaggle-imposed ceiling. Treat the
-  real limit as **TODO(TURN_TIME_LIMIT)** to confirm from the competition's
-  episode/agent specification once accessible, and re-check this budget
-  against it before final submission.
-- **Rationale**: Every other Kaggle Simulations competition to date has
-  used single-digit-second-per-turn budgets with a modest cumulative
-  overage pool; a heuristic (non-ML-inference, non-tree-search-heavy)
-  agent operating on a small board (≤10×10 tiles) will naturally run in
-  low single-digit milliseconds, so a 50ms internal target leaves a large
-  safety margin without blocking progress on an unconfirmed number
-  (constitution Principle VI).
-- **Alternatives considered**: (a) Block until the exact limit is
-  confirmed — rejected, violates Principle VI (no reasonable default
-  exists to justify blocking here; a conservative default does). (b)
-  Design for heavier per-turn search (e.g., multi-ply lookahead) from the
-  start — rejected for now per Principle V (Time-Boxed Simplicity); revisit
-  only if a simple heuristic's ceiling proves insufficient.
+- **Confirmed values** (`kaggriculture.json`): `actTimeout: 1` (1 second
+  per turn) and `remainingOverageTime: 60` (60-second cumulative overage
+  pool for the whole episode) — both far above the ≤50ms internal design
+  target originally chosen as a placeholder; that target remains valid
+  and is now known to carry a very large safety margin rather than being
+  an unconfirmed guess.
+- **Also confirmed**: three built-in reference agents ship with the
+  environment — `"pass"` (always PASS), `"random"` (weighted-random legal
+  actions), and `"starter"` (a deterministic single-tile carrot loop,
+  never expands land, never hires, never raises animals). These are
+  addressable by name directly in `kaggle_environments.make(...).run([...])`
+  without writing custom opponent files.
+- **Rationale for using the bundled environment as ground truth**: it is
+  the actual competition engine (not a re-implementation), so building
+  and evaluating against it removes all guesswork about rules,
+  observation shape, and action legality — strictly better than the
+  conservative-default approach originally planned.
+- **Impact on research.md R3 (opponent pool)**: superseded — see R3
+  below.
 
 ## R2: Kaggle Simulations submission packaging
 
@@ -38,9 +40,10 @@ file Kaggle simulation submissions require?
   under `src/kaggriculture_agent/` during development (for testability),
   and add a small bundling step (`evaluation/` tooling, detailed in
   tasks.md) that inlines/concatenates those modules into one
-  self-contained `submissions/<version>/agent.py` with a single
-  `agent(obs, config)` entry point and no local imports, matching the
-  `kaggle_environments` agent contract shown in `CONTEST.md`'s quickstart.
+  self-contained `submissions/<version>/main.py` with a single
+  `agent(obs)` entry point and no local imports, matching the confirmed
+  `kaggle_environments` agent contract (see R1 and
+  `contracts/agent-interface.md`).
 - **Rationale**: Writing and testing decision logic as one large file is
   error-prone and hard to unit-test; nearly every prior Kaggle Simulations
   competition solution uses a "develop modular, bundle flat" pattern for
@@ -49,28 +52,32 @@ file Kaggle simulation submissions require?
   day one — rejected, hurts testability/readability for no real benefit
   since bundling is a small, one-time tooling cost.
 
-## R3: Local evaluation opponent pool
+## R3: Local evaluation opponent pool — UPDATED (built-ins confirmed available)
 
 **Question**: What opponents should the local batch-evaluation harness use
 to produce a trustworthy win-rate/score signal (constitution Principle II,
 spec FR-002)?
 
-- **Decision**: Maintain three reference opponents locally: (1) a
-  `RANDOM` agent (legal-random actions, sanity/robustness baseline), (2) a
-  simple hand-written `GREEDY` heuristic (e.g., always plant the
-  best-`Yield/tile/day` affordable crop and sell immediately at current
-  price — a stronger, non-trivial baseline), and (3) the **previous
-  submitted version** of the agent itself (so every candidate must beat
-  what is already on the leaderboard, not just weak bots). Track all three
-  results per experiment-log entry.
-- **Rationale**: A single weak baseline (e.g., only `RANDOM`) would let
-  local evaluation rate strategies as "improving" even while they stay far
-  behind real competitors; self-play against the last submitted version
-  directly targets the quantity that matters (does this change actually
-  beat what's currently scored?).
+- **Decision**: Use the environment's own built-in `"random"` and
+  `"starter"` agents (see R1) as the first two reference opponents —
+  no custom opponent files needed for those. Add one custom, slightly
+  stronger `GREEDY` heuristic opponent (plants the best-affordable
+  `Yield/tile/day` crop, sells promptly) so there is a mid-tier target
+  between the weak `"starter"` baseline and whatever our own agent
+  becomes. Add the **previous submitted version** of our own agent as a
+  fourth, self-play opponent once one exists. Track results against all
+  available opponents per experiment-log entry.
+- **Rationale**: `"starter"` never expands past one tile and never uses
+  animals/hands/land, so beating it is a low bar; `"random"` is a
+  robustness check, not a strategy benchmark. `GREEDY` and self-play
+  against the previous version are what actually keep the local signal
+  honest about whether a change is really an improvement (Principle II).
 - **Alternatives considered**: Evaluate only via public leaderboard
   submissions — rejected outright, this is exactly the untrustworthy,
   submission-budget-burning pattern constitution Principle II forbids.
+  Skip `GREEDY` and rely only on the two built-ins — rejected, both
+  built-ins are weak enough that a mediocre agent could beat both while
+  still losing badly to real competitors.
 
 ## R4: Baseline strategy shape
 
@@ -97,6 +104,6 @@ spec FR-002)?
 
 ## Outcome
 
-All Technical Context unknowns are resolved (R1's real-world limit remains
-a tracked TODO but is no longer a blocking unknown — see decision above).
-Proceeding to Phase 1 design.
+All Technical Context unknowns are resolved, including R1's real-world
+per-turn time limit, which was confirmed directly from the bundled
+environment's source rather than assumed. Proceeding to Phase 1 design.
