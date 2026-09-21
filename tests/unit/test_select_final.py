@@ -7,8 +7,24 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "evaluation"))
 import select_final  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fake_submissions(tmp_path, monkeypatch):
+    """rank_candidates only considers versions with a real bundled
+    submissions/<version>/main.py (see select_final._is_submittable) --
+    fake one for every version name these tests use, in an isolated
+    tmp_path rather than the real repo's submissions/ directory."""
+    submissions_dir = tmp_path / "submissions"
+    for version in ("v1", "v2", "v3", "v4"):
+        version_dir = submissions_dir / version
+        version_dir.mkdir(parents=True)
+        (version_dir / "main.py").write_text("def agent(obs): return {'farmer': ['PASS']}")
+    monkeypatch.setattr(select_final, "SUBMISSIONS_DIR", submissions_dir)
 
 
 def _entry(version, win_rate, public_score=None, evaluation_results=True, mean_money=0, opponent_mean_money=0):
@@ -114,6 +130,20 @@ def test_load_entries_reads_jsonl(tmp_path):
 
 def test_load_entries_missing_file_returns_empty_list(tmp_path):
     assert select_final.load_entries(tmp_path / "nope.jsonl") == []
+
+
+def test_rank_candidates_excludes_versions_with_no_bundled_submission(tmp_path):
+    """Regression test: a dev-phase evaluation run logged under a
+    throwaway label like "v7-dev" (before the real v7 bundle existed)
+    once outranked the real "v7" by tiebreak noise between two separate
+    batch runs -- and `make submit`/`mark_final` would then point at a
+    version with no submissions/<version>/main.py to actually submit."""
+    entries = [
+        _entry("v7-dev", win_rate=1.0, mean_money=99999, opponent_mean_money=0),  # would win on paper
+        _entry("v1", win_rate=0.9, mean_money=5000, opponent_mean_money=1000),
+    ]
+    ranked = select_final.rank_candidates(entries)
+    assert [e["agent_version"] for e in ranked] == ["v1"]  # v7-dev excluded: no submissions/v7-dev/main.py
 
 
 def test_mark_final_appends_a_decision_record(tmp_path):

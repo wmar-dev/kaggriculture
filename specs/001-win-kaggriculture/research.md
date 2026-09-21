@@ -336,6 +336,41 @@ improvement since the original v2->v3 animal-husbandry addition itself,
 and it came from questioning a design assumption (a fixed target number)
 rather than another parameter tweak or bug fix.
 
+**v6's real Kaggle result** (submission ref `56436146`): `public_score`
+448.6 -- the biggest single jump yet (up from v5's 328.4), and the
+biggest jump across all six real submissions so far. Confirms the v6
+mechanism change (not just local benchmarks) translated to real
+competitive improvement.
+
+## v7: tune the v6 reinvestment reserve itself
+
+`REINVEST_RESERVE = 3` was a reasonable first guess when the mechanism
+was introduced (v6), not a tuned value. Swept it directly instead of
+assuming "more conservative is safer": 8-10 seasons/setting, 3
+independent batches.
+
+| `REINVEST_RESERVE` | Mean final money (batch 1 / 2 / 3) |
+| --- | --- |
+| 1.0 | 2,383 (reproduces the original cash-crash failure mode) |
+| 1.5 | 16,187 |
+| 2.0 | 48,846 / 37,058 / 38,732 |
+| 2.5 | -- / -- / 30,465 |
+| 3.0 (original v6 value) | 38,486 |
+| 4.0 | 34,031 |
+
+2.0 is a genuine local optimum -- it beats 1.5 *and* 2.5/3.0/4.0
+consistently, not a point on a monotonic "safer is better" curve.
+Reserve too low (1.0-1.5) reproduces the pre-v6 overspending crash;
+reserve too high (2.5+) is unnecessarily conservative and leaves cash
+idle that could already be compounding.
+
+**Outcome**: shipped `REINVEST_RESERVE = 2`. Batch evaluation on the
+bundled submission: 100% vs random/starter/greedy at **~39-43k** average
+money (up from v6's own ~35-41k), and a **67% self-play win rate vs v6**
+(19,532 vs 17,390) -- a real but more modest improvement than v6's own
+jump, as expected for tuning an already-good mechanism rather than
+introducing a new one.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

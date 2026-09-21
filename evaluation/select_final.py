@@ -16,6 +16,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = REPO_ROOT / "experiments" / "log.jsonl"
+SUBMISSIONS_DIR = REPO_ROOT / "submissions"
 
 sys.path.insert(0, str(REPO_ROOT / "evaluation"))
 from run_batch import _commit_sha, average_win_rate  # noqa: E402
@@ -28,12 +29,30 @@ def load_entries(log_path: Path = LOG_PATH) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
+def _is_submittable(version: str) -> bool:
+    """True only if `submissions/<version>/main.py` actually exists.
+
+    Development-phase evaluation runs are sometimes logged under a
+    throwaway label (e.g. "v7-dev") before the real bundle is built and
+    evaluated under its real version name -- without this check, such a
+    label could still win the ranking on a lucky batch (confirmed
+    happening: "v7-dev" outranked "v7" by tiebreak noise between two
+    separate batch runs) and `make submit`/`mark_final` would then point
+    at a version with no bundle to actually submit.
+    """
+    return (SUBMISSIONS_DIR / version / "main.py").exists()
+
+
 def _latest_per_version(entries: list[dict]) -> list[dict]:
     """Only entries that report evaluation_results represent a candidate
     version's evidence; later entries for the same version (e.g. a
-    re-evaluation, or a `mark_final` record) supersede earlier ones."""
+    re-evaluation, or a `mark_final` record) supersede earlier ones.
+    Versions with no actual bundled submission are excluded (see
+    `_is_submittable`)."""
     latest: dict[str, dict] = {}
     for entry in entries:
+        if not _is_submittable(entry["agent_version"]):
+            continue
         if entry.get("evaluation_results"):
             latest[entry["agent_version"]] = entry
         elif entry["agent_version"] in latest and entry.get("kaggle_result"):
