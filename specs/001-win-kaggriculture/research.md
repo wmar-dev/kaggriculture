@@ -234,6 +234,50 @@ head-to-head result much (which is exactly what the near-50/50 self-play
 record shows) and is still worth shipping, since real Kaggle matches
 will hit that tail case some nonzero fraction of the time.
 
+**v4's real Kaggle result** (submission ref `56415012`): `public_score`
+293.6, a modest improvement over v3's 297.3/282.3-ish readings from
+around the same time (still a converging, noisy rating -- see the note
+above about v2's own score moving between checks).
+
+## v5: fix a second, larger animal-economics bug (wheat over-buying)
+
+Went back to investigate the deeper cash-flow volatility noted as
+unresolved in the v4 section above, rather than leave it. Traced a 4/4
+run's per-turn money deltas directly (not just daily snapshots this
+time) and found the real, larger drain: `BUY_PRODUCT WHEAT` orders
+firing on almost every qualifying turn, each nudging the scarcity price
+up further. Root cause: the wheat-restock check compared
+`shed.get("WHEAT", 0)` against the number of placed animals -- but hands
+PICKUP wheat into their own inventory immediately once it lands in the
+shed (see `_decide_hand_action`), so shed stock alone constantly reads
+as "low" even when there is already enough wheat in transit to feed
+every animal that day. This is the same class of bug as v4's fix
+(gating on the wrong count), just for wheat instead of cows, and a much
+bigger drain in practice since it could re-trigger many times per day
+rather than being a rare escape event.
+
+**Fix**: count wheat already held across all hand inventories, not just
+the shed, before buying more.
+
+**Re-tested after the fix**: 4/4 jumped from ~8k (v4, cow-fix only) to
+~16.5k vs `starter` in a single run; a reliable 10-season batch
+comparison of 3/3 vs 4/4 (both with *both* fixes applied) gave 3/3 a
+mean of 19,965 vs 4/4's 16,149 -- **3/3 is still clearly better**, just
+by a smaller margin than before. So the wheat-buying bug explains most,
+but not all, of why naive scale-up underperformed; some other, smaller
+inefficiency remains at 4+ hands (candidate: per-hand shed-queueing/path
+congestion noted in the original scale-up investigation), left as an
+open question rather than chased further this iteration.
+
+**Decision**: ship the wheat fix at the same proven 3/3 scale (still the
+best-performing configuration found so far). Batch evaluation (12
+seasons/opponent) shows v5 at 100% vs random/starter/greedy, at a
+noticeably higher money level than v3/v4's own numbers (~19-21k vs
+~18-20k), and a clean **100% win rate vs v4 in direct self-play**
+(mean money 16,508 vs 14,804) -- unlike v4's fix, this one is a real,
+consistent improvement at the shipped scale, not just a tail-risk
+mitigation.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
