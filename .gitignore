@@ -8,6 +8,11 @@ venv/
 build/
 dist/
 
+# RL training artifacts (regeneratable via training/train.py; large
+# binaries, many checkpoints during experimentation -- commit a specific
+# model deliberately if one is ever chosen for the submission)
+training/models/
+
 # OS
 .DS_Store
 
