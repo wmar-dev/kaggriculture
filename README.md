@@ -40,3 +40,10 @@ it shows you what it's about to do and asks for confirmation first.
 - `experiments/log.jsonl` — append-only log of every evaluated/submitted
   agent version
 - `submissions/vN/main.py` — frozen, submittable bundles
+- `training/` — experimental: RL (PPO) training for the farmer's
+  tile-tending policy specifically, holding the rest of the proven
+  heuristic (crop choice, market orders, animal husbandry) fixed. See
+  `specs/001-win-kaggriculture/research.md`'s RL section for the scoping
+  rationale and results; `training/env.py`'s docstring for what is and
+  isn't RL-controlled. Not part of the submitted agent unless/until a
+  trained policy is shown to beat it.
