@@ -167,15 +167,42 @@ last-callable bugs were found for v1/v2:
    budget can actually sustain, per constitution Principle V) immediately
    turned a losing run into a strongly winning, compounding one.
 
-**Outcome**: `evaluation/run_batch.py` (12 seasons/opponent) shows v3 at
-100% win rate vs random/starter/greedy and vs v2 in direct self-play, at
-roughly **3x v2's average final money** (~18-19k vs ~6-6.6k). v3 is
-marked as the final selection in `experiments/log.jsonl`, pending a real
-Kaggle submission to close the loop on whether it also closes the
-local/leaderboard gap that started this investigation. A natural v4 would
-raise `TARGET_STRUCTURES`/`HIRE_TARGET` again now that the mechanic is
-proven, but staged incrementally this time rather than jumping straight
-to a large target.
+**Outcome (local)**: `evaluation/run_batch.py` (12 seasons/opponent) shows
+v3 at 100% win rate vs random/starter/greedy and vs v2 in direct
+self-play, at roughly **3x v2's average final money** (~18-19k vs
+~6-6.6k).
+
+**Outcome (real, submission ref `56387121`)**: unlike v2 (0 wins in its
+sampled episodes), v3 went **6W-12L (33%) across all 18 played
+episodes**, with money margins in a competitive range rather than
+blowouts (we scored ~13k-23k most games). Downloaded and inspected every
+replay (`kaggle competitions episodes` / `replay`, cross-referenced
+against `info.TeamNames` since player index isn't fixed per episode).
+Pattern: we beat clearly weaker/newer submissions (opponents scoring
+1k-12k) and lose to a visible tier of strong opponents scoring
+**40k-74k** -- well beyond even our improved range, and beyond what the
+single 132,021-scoring opponent from the v2 investigation suggested was
+the ceiling. The public leaderboard `score` column itself moved only
+235.2 -> 262.8 -> 282.3 across these submissions and is evidently a
+converging rating (the same submission's own displayed score changed
+over time as more episodes completed) rather than a fixed value -- too
+early/noisy to read much into on its own, but the raw episode rewards are
+real, direct evidence and point the same direction as the leaderboard
+did: still meaningfully behind the strong tier of the field.
+
+**v4 attempt, reverted**: tried raising the targets incrementally --
+6 structures/5 hands first (regressed badly: only barely beat `starter`,
+zero cows ever got placed), then a smaller step, 4 structures/4 hands
+(also regressed the same way: lost to `starter`, zero cows placed). Both
+are worse than 3/3 by a wide margin, not a smooth scaling curve -- there
+is a sharp cliff somewhere between 3 and 4 that isn't understood yet
+(candidates: per-hand shed-queueing congestion in `_decide_hand_action`,
+or the fixed daily cost of feeding/managing more animals outpacing
+income before enough of them mature). Reverted `TARGET_STRUCTURES`/
+`HIRE_TARGET` back to 3/3 (matches the actually-submitted v3) rather than
+ship an untested regression. Understanding *why* 4 fails where 3
+succeeds -- not just retrying different numbers -- is the right next
+step before attempting a v4 scale-up again.
 
 ## Outcome
 
