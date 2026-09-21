@@ -438,6 +438,56 @@ in observation.py; or a genuinely different approach such as
 reinforcement learning) are qualitatively different investments, not
 further parameter search.
 
+## RL experiment: can a learned policy beat the farmer heuristic?
+
+Scoped deliberately (see `training/env.py`'s docstring): trained PPO
+(stable-baselines3) to control only the farmer's per-turn tile-tending
+action (9-way discrete: movement, water, harvest, dig, plant, pass), with
+crop choice, all market orders, and the entire animal-husbandry hand loop
+left exactly as v7 (unchanged, not RL-controlled). Training used
+192-step episodes (vs. the real 720) against the built-in `starter`
+opponent for faster throughput (~550-650 env-steps/sec single-process).
+
+**Training plateaued early**: the rolling-window training reward (final
+money on 192-step episodes) stopped improving somewhere around
+timestep 100,000-150,000 and stayed flat (~370-385) through 500,000 --
+no further learning in the next 350,000 timesteps. Training was stopped
+at 500,000 steps rather than run the full planned 2,000,000, since two
+evaluated checkpoints (100k and 500k) already performed statistically
+indistinguishably on real 720-step episodes.
+
+**Evaluation** (the 500k checkpoint, full 720-step episodes): 100% win
+rate vs random/starter/greedy at ~36-40k average money -- comparable to
+v7's own ~39-43k range vs the same opponents. Direct self-play vs v7,
+two independent 15-season batches: **9W-6L (60%)**, then **7W-8L
+(47%)** -- combined 16W-14L (53%) across 30 games, with money roughly
+tied in both batches (~10-12k each side). This is the same
+noise-dominated pattern seen for `HAND_SLACK`/`SELL_BATCH_CAP` above,
+not the sharp, reproducible signal `REINVEST_RESERVE` showed: **the
+trained policy performs roughly on par with the hand-crafted farmer
+heuristic, not a confident improvement over it.**
+
+**Assessment**: this is still a genuinely interesting result on its own
+terms -- a policy trained from scratch with no domain knowledge of
+movement/pathing strategy reached rough parity, in under 15 minutes of
+wall-clock training, with a heuristic that took an entire session of
+careful, domain-informed iteration (and several real bugs found and
+fixed) to build. But "roughly tied" doesn't justify the substantial
+additional engineering this would need to actually ship: torch/
+stable-baselines3 aren't guaranteed available in Kaggle's actual
+sandboxed episode runner, so a real submission would need the trained
+policy's weights extracted into a dependency-free pure-Python/numpy
+forward pass, bundled the same way `evaluation/bundle_submission.py`
+bundles the heuristic agent -- real work, not worth doing for a policy
+that isn't yet a clear win. Left as `training/models/checkpoints/
+ppo_farmer_v1_500000_steps.zip` (gitignored, regeneratable via
+`training/train.py`) rather than deployed. A stronger next attempt would
+likely need training against `v7` itself (self-play) rather than
+`starter`, a longer/better-tuned run, and a look at whether the reward
+shaping or observation encoding (see `training/env.py`) is limiting
+what the policy can learn -- left as a documented option, not pursued
+further this session.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
