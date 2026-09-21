@@ -278,6 +278,64 @@ noticeably higher money level than v3/v4's own numbers (~19-21k vs
 consistent improvement at the shipped scale, not just a tail-risk
 mitigation.
 
+**v5's real Kaggle result** (submission ref `56417041`): `public_score`
+342.0 -- a clean upward trend across all five real submissions so far
+(235.2 -> 242.6 -> 297.3 -> 311.1 -> 342.0), the first time the
+leaderboard signal has moved consistently in the same direction as the
+local improvements rather than being flat/noisy.
+
+## v6: replace the fixed animal-acquisition target with progressive reinvestment
+
+With both v4's and v5's bugs fixed, went back to the still-unexplained
+part of the original scale-up investigation: why did a *proportionally*
+scaled 4/4 setup (same 1:1 hands-to-structures ratio as the working 3/3)
+still underperform 3/3, when neither of the two fixed bugs should have
+cared about the ratio itself?
+
+**Isolation test** (8 seasons/config): held hands and structures apart
+to see which one actually mattered.
+
+| Config | Mean final money |
+| --- | --- |
+| 3 structures / 3 hands (baseline) | 20,521 |
+| 4 structures / 3 hands (animals w/o matching hands) | 15,319 |
+| 3 structures / 4 hands (extra idle hand) | 18,280 |
+
+More animals without matching hands was clearly the worst combination --
+but a *second* run of plain 4/4 (matching ratio) still only averaged
+12,304-16,149 across two separate batches, confirming the regression
+isn't just an hours-per-animal coverage problem either.
+
+**Real hypothesis**: `TARGET_STRUCTURES` raced to acquire N animals as
+soon as barely affordable, which front-loads capital into several
+simultaneously-young, unproductive animals (each needs 8 days before
+`HARVEST` does anything at all) and delays the compounding that would
+otherwise fund further expansion -- classic "too wide too fast" in a
+game with strong compounding dynamics. A fixed target chosen in advance
+(3, 4, 6 -- doesn't matter which) can never adapt to how healthy the
+economy actually is at the moment of each purchase.
+
+**Fix**: replaced `TARGET_STRUCTURES`/`HIRE_TARGET` with
+`REINVEST_RESERVE` (buy another cow only once money is comfortably above
+`REINVEST_RESERVE * cost`, i.e. cash health gates expansion, not a
+number decided in advance) and a dynamic `_hire_target()` that tracks
+live+pending animals plus a small buffer, both capped by a generous
+safety ceiling (`MAX_STRUCTURES`/`MAX_HANDS` = 15, roughly matching the
+strongest real opponent observed) rather than a small target to race
+toward.
+
+**Outcome**: night-and-day difference. A single trace shows organic,
+staged growth -- 2 cows by day 3, 6 by day 15, money compounding from
+~5k at day 15 to 35k+ by day 27 -- instead of the previous pattern of
+racing to acquire everything on day 0 and then surviving a cash crunch.
+Batch evaluation (12 seasons/opponent) on the bundled submission: 100%
+vs random/starter/greedy at **~35-41k** average money (roughly *double*
+v5's ~19-21k), and a decisive **92% win rate vs v5 in direct self-play**
+(mean money 26,830 vs 14,817, nearly 2x). This is the largest single
+improvement since the original v2->v3 animal-husbandry addition itself,
+and it came from questioning a design assumption (a fixed target number)
+rather than another parameter tweak or bug fix.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
