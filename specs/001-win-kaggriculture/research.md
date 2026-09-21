@@ -407,6 +407,37 @@ by hand-turn cost per unit of ongoing production, not just initial
 payback speed -- left as a documented open question rather than
 half-solved this iteration.
 
+## Heuristic-tuning plateau assessment (post-v7)
+
+After v7, checked for further quick, high-confidence wins the same way
+`REINVEST_RESERVE` was found -- direct parameter sweeps with enough
+seasons to trust the result:
+
+- `HAND_SLACK` (0-4): no stable ranking. An 8-season sweep suggested 0
+  and 3 were best; a follow-up 15-season comparison of 2 vs 3 flipped
+  the result entirely (2 came out clearly ahead). The variance
+  (stdev ~11-20k) swamps any true effect at this sample size.
+- `SELL_BATCH_CAP` (8-60): same pattern. A 15-season comparison favored
+  25 over 15; a 20-season comparison of the same two values flipped it
+  back in favor of 15.
+- Land-purchase threshold (`next_cost * 2`): not swept -- land is a
+  one-time ~$7,000 total across all 3 quadrants against an economy now
+  routinely reaching $40k+, so even a real effect here is unlikely to be
+  distinguishable from the noise floor just demonstrated on two other
+  parameters.
+
+This is a real contrast with `REINVEST_RESERVE`, which showed a large,
+sharp, and *reproducible* effect (a genuine cliff, confirmed across 3
+independent batches) -- these parameters don't have that kind of signal
+to find. Combined with the reverted animal-diversification attempt
+(a real, understood regression, not a tuning question), this is a
+reasonable point to call the current heuristic-tuning approach at a
+plateau: the remaining big levers (making the agent react to the
+opponent's farm state at all -- currently never read, see `opponent_farm`
+in observation.py; or a genuinely different approach such as
+reinforcement learning) are qualitatively different investments, not
+further parameter search.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
