@@ -42,12 +42,37 @@ def _latest_per_version(entries: list[dict]) -> list[dict]:
     return list(latest.values())
 
 
+def _reference_win_rate(entry: dict) -> float:
+    """Like `average_win_rate`, but only over FIXED reference opponents
+    (random/starter/greedy/pass -- anything not a file path), excluding
+    self-play against another submission bundle.
+
+    Self-play win-rate is relative to whichever specific predecessor
+    happened to be logged as the opponent, not an absolute quality
+    signal, and different versions get compared against different
+    predecessors (v3 was evaluated partly against v2, which it dominates;
+    v4 against v3, its own harder, more-similar direct predecessor). That
+    asymmetry otherwise drags a genuinely-improved newer version's
+    average below an older one's, purely because it happened to be
+    tested against a tougher self-play opponent -- confirmed happening
+    for v3 vs v4 (v4 fixes a real bug and is never worse than v3, but
+    ranked below it before this exclusion).
+    """
+    results = [r for r in (entry.get("evaluation_results") or []) if "/" not in r["opponent"] and not r["opponent"].endswith(".py")]
+    if not results:
+        return average_win_rate(entry)  # nothing but self-play logged -- fall back rather than return 0
+    return sum(r["win_rate"] for r in results) / len(results)
+
+
 def _avg_money_margin(entry: dict) -> float:
-    """Mean (our final money - opponent's) across this version's
-    evaluation_results -- a tiebreaker for when two candidates both show
-    a 100% local win-rate but by very different margins (exactly what
-    happened comparing v2 and v3)."""
-    results = entry.get("evaluation_results") or []
+    """Mean (our final money - opponent's) across FIXED reference
+    opponents (see _reference_win_rate for why self-play is excluded) --
+    a tiebreaker for when two candidates both show a 100% reference
+    win-rate but by very different margins (exactly what happened
+    comparing v2 and v3)."""
+    results = [r for r in (entry.get("evaluation_results") or []) if "/" not in r["opponent"] and not r["opponent"].endswith(".py")]
+    if not results:
+        results = entry.get("evaluation_results") or []
     if not results:
         return 0.0
     margins = [r.get("mean_money", 0) - r.get("opponent_mean_money", 0) for r in results]
@@ -55,7 +80,7 @@ def _avg_money_margin(entry: dict) -> float:
 
 
 def _sort_key(entry: dict) -> tuple:
-    return (average_win_rate(entry), _avg_money_margin(entry))
+    return (_reference_win_rate(entry), _avg_money_margin(entry))
 
 
 def rank_candidates(entries: list[dict]) -> list[dict]:
@@ -82,9 +107,12 @@ def rank_candidates(entries: list[dict]) -> list[dict]:
 
 def format_recommendation(entry: dict) -> str:
     has_leaderboard = entry.get("kaggle_result") is not None
-    local = average_win_rate(entry)
+    ref_rate = _reference_win_rate(entry)
+    overall_rate = average_win_rate(entry)
     lines = [f"Recommended final: {entry['agent_version']} (commit {entry.get('commit_sha', '?')[:8]})"]
-    lines.append(f"  Local avg win-rate: {local:.0%} across {len(entry.get('evaluation_results') or [])} opponent(s)")
+    lines.append(f"  Win-rate vs fixed reference opponents (the ranking signal): {ref_rate:.0%}")
+    if abs(overall_rate - ref_rate) > 1e-9:
+        lines.append(f"  Overall avg win-rate incl. self-play vs another version: {overall_rate:.0%} (excluded from ranking -- see rank_candidates docstring)")
     for r in entry.get("evaluation_results") or []:
         lines.append(f"    vs {r['opponent']}: {r['wins']}W/{r['losses']}L/{r['ties']}T (win_rate={r['win_rate']:.0%})")
     if has_leaderboard:

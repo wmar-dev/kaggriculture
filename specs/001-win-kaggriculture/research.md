@@ -190,19 +190,49 @@ early/noisy to read much into on its own, but the raw episode rewards are
 real, direct evidence and point the same direction as the leaderboard
 did: still meaningfully behind the strong tier of the field.
 
-**v4 attempt, reverted**: tried raising the targets incrementally --
-6 structures/5 hands first (regressed badly: only barely beat `starter`,
-zero cows ever got placed), then a smaller step, 4 structures/4 hands
-(also regressed the same way: lost to `starter`, zero cows placed). Both
-are worse than 3/3 by a wide margin, not a smooth scaling curve -- there
-is a sharp cliff somewhere between 3 and 4 that isn't understood yet
-(candidates: per-hand shed-queueing congestion in `_decide_hand_action`,
-or the fixed daily cost of feeding/managing more animals outpacing
-income before enough of them mature). Reverted `TARGET_STRUCTURES`/
-`HIRE_TARGET` back to 3/3 (matches the actually-submitted v3) rather than
-ship an untested regression. Understanding *why* 4 fails where 3
-succeeds -- not just retrying different numbers -- is the right next
-step before attempting a v4 scale-up again.
+**v4: root-caused the scale-up cliff, shipped the fix at proven scale**
+
+First tried raising the targets incrementally -- 6 structures/5 hands
+(regressed badly: only barely beat `starter`, zero cows ever got placed),
+then a smaller step, 4/4 (same failure mode). Rather than keep guessing
+numbers, traced the 4/4 attempt day by day: cows were placed successfully
+around day 0-1, **all escaped by day 3** (a hiring gap left them unfed 2
+consecutive days), and -- critically -- **never replaced for the rest of
+the 30-day season**, even though a spare cow sat unused in the shed the
+whole time. Root cause: the BUY_ANIMAL/PICKUP gating compared
+`structures_owned + pending_animals < TARGET_STRUCTURES`, where
+`structures_owned` counts built PASTURE/COOP tiles -- and a built
+structure never reverts to `None` even after its animal starves and
+escapes. Once built-structure-count alone ever reached the target, the
+agent considered itself "done" acquiring animals, permanently, regardless
+of how many were actually still alive.
+
+**Fix**: gate on `_count_placed_animals(obs) + pending_animals` (live
+animals, not built structures) in both the market-order buy check and
+the shed PICKUP check. This is a real correctness bug independent of
+scale -- it just took a higher target (where the hiring-gap/escape event
+is more likely to occur at least once during tuning) to surface clearly.
+Re-tested 4/4 with the fix: cows are now replaced after escaping, and
+the run flips from a loss to a win (~8k vs starter, up from losing
+outright) -- though still well under 3/3's own ~19-20k, because a
+separate, not-yet-understood cash-flow volatility issue remains at that
+scale (money repeatedly dropped to single digits for several consecutive
+days in the 4/4 trace, blocking even the now-cheap `HIRE_MONEY_RESERVE`
+gate). That deeper issue is left for a future scale-up attempt.
+
+**Decision**: ship the fix at the already-proven 3/3 scale rather than
+the still-shaky 4/4 one. Batch evaluation (12 seasons/opponent) shows v4
+at 100% vs random/starter/greedy (comparable to v3's own numbers,
+~18-20k), and roughly a **coin flip against v3 in direct self-play**
+(4W-4L-4T, mean money essentially tied: 17,955 vs 17,982). That's
+expected and correct for this kind of fix: the escape/replacement bug is
+a rare tail-risk event, not something that fires every game -- when it
+doesn't trigger, v3 and v4 play identically; when it does, v4 recovers
+and v3 stays stuck with a permanently smaller operation for the rest of
+the season. A fix that only matters in the tail won't move an *average*
+head-to-head result much (which is exactly what the near-50/50 self-play
+record shows) and is still worth shipping, since real Kaggle matches
+will hit that tail case some nonzero fraction of the time.
 
 ## Outcome
 

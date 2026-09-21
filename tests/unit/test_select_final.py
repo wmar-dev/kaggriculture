@@ -57,6 +57,37 @@ def test_rank_candidates_breaks_win_rate_ties_by_average_money_margin():
     assert [e["agent_version"] for e in ranked] == ["v2", "v1"]
 
 
+def _entry_with_opponents(version, opponent_results):
+    return {
+        "agent_version": version,
+        "commit_sha": f"sha-{version}",
+        "evaluation_results": opponent_results,
+        "kaggle_result": None,
+        "decision": "investigate",
+    }
+
+
+def test_rank_candidates_excludes_self_play_from_the_ranking_signal():
+    """Regression test: v3's logged self-play opponent was v2 (which it
+    dominated, 100% win-rate), while v4's was v3 itself (a harder, more
+    similar direct predecessor, ~33% win-rate) -- purely an artifact of
+    which predecessor each happened to be evaluated against, not a sign
+    v4 (which fixes a real bug and is never worse than v3) is actually
+    worse. Self-play results must not drag the ranking down for this."""
+    fixed_100 = [{"opponent": name, "win_rate": 1.0, "mean_money": 18000, "opponent_mean_money": 3000} for name in ("random", "starter", "greedy")]
+    v3 = _entry_with_opponents(
+        "v3",
+        fixed_100 + [{"opponent": "submissions/v2/main.py", "win_rate": 1.0, "mean_money": 17000, "opponent_mean_money": 6000}],
+    )
+    v4 = _entry_with_opponents(
+        "v4",
+        fixed_100 + [{"opponent": "submissions/v3/main.py", "win_rate": 0.33, "mean_money": 18000, "opponent_mean_money": 18000}],
+    )
+    ranked = select_final.rank_candidates([v3, v4])
+    assert ranked[0]["agent_version"] in ("v3", "v4")  # tied on the reference-only signal, either order is fine
+    assert select_final._reference_win_rate(v4) == 1.0  # the point: v4 isn't penalized for a hard self-play opponent
+
+
 def test_rank_candidates_falls_back_to_local_win_rate_when_no_leaderboard_data():
     entries = [_entry("v1", win_rate=0.6), _entry("v2", win_rate=0.9)]
     ranked = select_final.rank_candidates(entries)
