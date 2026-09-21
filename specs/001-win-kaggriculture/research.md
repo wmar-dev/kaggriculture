@@ -371,6 +371,42 @@ money (up from v6's own ~35-41k), and a **67% self-play win rate vs v6**
 jump, as expected for tuning an already-good mechanism rather than
 introducing a new one.
 
+## Tried and reverted: diversifying animal type (GOOSE/SHEEP)
+
+Computed the same payback-speed-weighted metric already used for crop
+choice, applied to all three animals: GOOSE scores 12.5 (cost 300, EGG@50,
+first_yield_day 4), SHEEP 11.1 (cost 500, WOOL@200, first_yield_day 6),
+COW only 10.0 (cost 400, MILK@160, first_yield_day 8) -- on paper, COW
+(the animal hardcoded since v3, chosen only because it's what the
+strongest real opponent happened to scale) looks like the *worst* of the
+three.
+
+Generalized `choose_best_animal` the same way as `choose_best_crop`
+(including the v2-style diversification penalty) and re-tested:
+
+- All three animals, dynamically chosen: **~6.1k** final money vs
+  starter -- a severe regression from COW-only's ~19-48k.
+- GOOSE only (single animal type, isolating the choice from any
+  structure-diversity coordination cost): **mean 6,362** across 8
+  seasons -- still badly underperforms COW-only.
+
+So it isn't structure-type fragmentation (COOP + PASTURE built
+alongside each other) causing the regression -- GOOSE itself
+underperforms COW even alone. Best current explanation: the
+payback-speed metric only accounts for time-to-first-return, not ongoing
+attention cost, and GOOSE's `interval=1` (daily production, capped at
+`max_held=4`) needs harvesting roughly twice as often as COW's
+`interval=2` (every other day, `max_held=6`) to avoid wasting capped
+production -- and hands are the confirmed throughput-limiting resource
+for this whole subsystem (see the v6 isolation test above). A metric
+that ignores hand-turns-consumed-per-dollar-earned can favor an animal
+that "pays back fast" in isolation but starves the rest of the operation
+of hand attention in practice. Reverted cleanly to the proven COW-only
+v7 code rather than ship the regression; a real fix would need to weight
+by hand-turn cost per unit of ongoing production, not just initial
+payback speed -- left as a documented open question rather than
+half-solved this iteration.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
