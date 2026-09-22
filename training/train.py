@@ -60,7 +60,7 @@ def make_env(opponent: str, episode_steps: int):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timesteps", type=int, default=300_000)
-    parser.add_argument("--opponent", default="starter", choices=["pass", "random", "starter"])
+    parser.add_argument("--opponent", default="starter", help="Built-in name (pass/random/starter) or a path to a bundled submission (e.g. submissions/v7/main.py) for self-play")
     parser.add_argument("--episode-steps", type=int, default=192, help="Shorter than the real 720 for faster training throughput")
     parser.add_argument("--n-envs", type=int, default=4)
     parser.add_argument("--out", default="training/models/ppo_farmer")

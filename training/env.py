@@ -16,6 +16,10 @@ tile-tending heuristic specifically" while holding everything else
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from pathlib import Path
+
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
@@ -161,17 +165,45 @@ def encode_observation(obs: GameObservation) -> np.ndarray:
     return np.array(features, dtype=np.float32)
 
 
+def load_agent_from_file(path: str):
+    """Load a submission bundle's `agent` callable, mirroring
+    kaggle_environments' own "last callable defined in the file" loading
+    convention (see src/kaggriculture_agent/agent.py's module docstring
+    for why that convention matters and how to not trip over it)."""
+    module_path = Path(path).resolve()
+    module_name = f"_opponent_{module_path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module  # needed for @dataclass and similar introspecting decorators
+    spec.loader.exec_module(module)
+    candidates = [v for k, v in vars(module).items() if callable(v) and not k.startswith("__")]
+    if not candidates:
+        raise ValueError(f"No callable found in {path}")
+    return candidates[-1]
+
+
 class KaggricultureFarmerEnv(gym.Env):
-    """Single-agent Gym view of the farmer's per-turn action, playing
-    against a fixed built-in opponent (see BUILTIN_AGENTS). Hands and all
-    market orders are driven automatically by the proven v7 heuristic."""
+    """Single-agent Gym view of the farmer's per-turn action. Hands and
+    all market orders are driven automatically by the proven v7
+    heuristic; only the farmer's action is controlled by the policy
+    being trained.
+
+    `opponent` is either a built-in name ("pass"/"random"/"starter") or a
+    path to a bundled submission file (e.g. "submissions/v7/main.py"),
+    for self-play against a real prior version rather than just the
+    built-in bots.
+    """
 
     metadata = {"render_modes": []}
 
     def __init__(self, opponent: str = "starter", episode_steps: int = 192):
         super().__init__()
-        if opponent not in BUILTIN_AGENTS:
-            raise ValueError(f"Unknown built-in opponent {opponent!r}; choices: {list(BUILTIN_AGENTS)}")
+        if opponent in BUILTIN_AGENTS:
+            self._opponent_fn = BUILTIN_AGENTS[opponent]
+        elif Path(opponent).exists():
+            self._opponent_fn = load_agent_from_file(opponent)
+        else:
+            raise ValueError(f"Unknown opponent {opponent!r}: not a built-in ({list(BUILTIN_AGENTS)}) and no such file")
         self.opponent = opponent
         self.episode_steps = episode_steps
         self._kaggle_env = None
@@ -208,7 +240,7 @@ class KaggricultureFarmerEnv(gym.Env):
         our_action = {"farmer": farmer_action, "hands": hands_actions, "market": market_orders}
 
         opp_obs = self._kaggle_env.state[1].observation
-        opp_action = BUILTIN_AGENTS[self.opponent](opp_obs)
+        opp_action = self._opponent_fn(opp_obs)
 
         self._kaggle_env.step([our_action, opp_action])
 
