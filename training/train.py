@@ -66,18 +66,23 @@ def main() -> int:
     parser.add_argument("--out", default="training/models/ppo_farmer")
     parser.add_argument("--print-every", type=int, default=5000)
     parser.add_argument("--checkpoint-every", type=int, default=100_000, help="Save an intermediate checkpoint every N timesteps, so progress can be evaluated without waiting for the full run")
+    parser.add_argument("--init-from", default=None, help="Warm-start from an existing checkpoint (e.g. after switching to a stronger opponent) instead of training from scratch")
     args = parser.parse_args()
 
     vec_env = DummyVecEnv([make_env(args.opponent, args.episode_steps) for _ in range(args.n_envs)])
 
-    model = PPO(
-        "MlpPolicy",
-        vec_env,
-        verbose=0,
-        n_steps=512,
-        batch_size=256,
-        learning_rate=3e-4,
-    )
+    if args.init_from:
+        print(f"Warm-starting from {args.init_from}", flush=True)
+        model = PPO.load(args.init_from, env=vec_env)
+    else:
+        model = PPO(
+            "MlpPolicy",
+            vec_env,
+            verbose=0,
+            n_steps=512,
+            batch_size=256,
+            learning_rate=3e-4,
+        )
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
