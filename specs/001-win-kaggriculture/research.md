@@ -488,6 +488,39 @@ shaping or observation encoding (see `training/env.py`) is limiting
 what the policy can learn -- left as a documented option, not pursued
 further this session.
 
+**Follow-up: self-play against v7 itself.** Added support for loading a
+real bundled submission as the training opponent (`training/env.py`'s
+`load_agent_from_file`, mirroring `kaggle_environments`' own
+last-callable-in-the-file loading convention -- needed a
+`sys.modules` registration fix for the bundle's `@dataclass`-decorated
+`GameObservation` to import correctly). Warm-started from the 500k
+`starter`-trained checkpoint and continued training against
+`submissions/v7/main.py` directly, on the theory that a weak, static
+opponent doesn't create enough competitive pressure to learn something
+better than parity.
+
+**Result: an even flatter plateau.** The rolling training-reward curve
+was completely flat from timestep 10,000 through 300,000 (295-302
+throughout, no trend at all) -- more pronounced than the `starter` run's
+plateau. Evaluation confirmed no improvement: 42% win rate vs v7 (13,348
+vs 14,467), statistically the same as the earlier checkpoint's 50%.
+Training stopped at 300k rather than continue to the planned 1,000,000,
+since two independent training runs (different opponents, one warm-started
+from the other) both plateaued this clearly and this quickly.
+
+**Conclusion**: this is now reasonably strong, convergent evidence that
+the *current* RL setup -- this observation encoding, this 9-action
+discrete space, per-step money-delta reward, 192-step training episodes
+-- has hit its own ceiling around "roughly tied with the hand-crafted
+heuristic," not a compute or opponent-strength limitation. Pushing
+further would need to change the setup itself (richer/different
+observation features, a different reward shaping, full-length training
+episodes, or a fundamentally different action space) rather than more
+timesteps or a stronger opponent -- a genuinely different follow-up
+project, not a continuation of this one. v7 remains the submitted/
+recommended agent; the RL exploration ends here for this session with
+an honest "matched, didn't beat" result.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
