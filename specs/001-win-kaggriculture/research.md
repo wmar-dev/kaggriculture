@@ -797,6 +797,54 @@ Purchases fell from 17 to 11 (7,300 -> 4,900) with the herd unchanged at
 random/starter/greedy at 42-49k, and **100% vs v8** (14W-0L, 32,111 vs
 23,630). Two dev batches measured 90% and 85%.
 
+## v10 confirmed on the leaderboard; feed self-sufficiency abandoned
+
+**v10 scored 447.6, the best of any submission** (v8 430.5, v7 410.2,
+v6 406.4, v9 405.6). Real episodes: **7W-8L, our mean 39,764 against
+the field's 40,450** -- near parity, up from v8's 34,488 against 43,248.
+Local evaluation predicted this correctly, unlike v9, which fits: v10
+only removed waste (animals bought and never placed) without changing
+scale or strategy, so there was no scale-dependent effect for the
+same-scale local bench to miss.
+
+Also worth recording: **v9 rose from 363.3 to 405.6** as its episodes
+accumulated. Fresh scores really do understate, so the earlier decision
+to judge v9 on episode outcomes rather than its day-one score was the
+right call -- though v9 still sits below v8, so the revert stands.
+
+**Why the herd cannot simply be grown.** Diagnosing the ~7-animal
+ceiling directly: at that size our own products are *not* glutted
+(MILK 257, WOOL 245, both near base), but our wheat buying has pushed
+WHEAT from its base of 25 to **51** across 78 units. Feed cost, not
+market saturation and not land, is what caps the herd. Animals are
+already optimally placed (mean distance 0.9 tiles from the shed), so
+travel isn't it either.
+
+**Feed self-sufficiency: three attempts, all abandoned.** The obvious
+implication -- grow the feed instead of buying it -- was tried three
+distinct ways and never delivered its own mechanism:
+
+1. *Farmer grows it* (v9): purchases fell 143 -> 61, but the herd shrank
+   from 9 to 7 and the real score dropped. The farmer is the only worker
+   on high-value crops, and that income funds reinvestment.
+2. *Idle hands grow it, uncapped*: 39% of hand-turns were PASS, so the
+   labour existed. But greedy nearest-tile logic plants instantly and
+   must walk to water, so it planted 176 against 70 waterings, left 11
+   tiles of weeds, and purchases went *up* (173).
+3. *Idle hands, cap sized to actual need* (one wheat tile yields ~1
+   unit/day, so a herd of N needs ~N tiles): weeds fell to 3 and the
+   herd reached 10, but purchases still rose (113 vs the 78 baseline)
+   and the batch measured 55% -- inside noise.
+
+The common failure is that "idle" hands are only idle in the sense that
+they PASS; given crop work they spend nearly all their turns walking
+between scattered tiles. `PLANT_WHEAT` never even reached the top eight
+hand actions, while movement took 2,472 turns. Productive multi-tile
+farming needs coordination the current greedy per-unit loop doesn't
+have -- assigning each hand a stable plot, rather than every hand
+re-deciding for the nearest needy tile each turn. That's a different
+design, not a tweak, and it is where this thread stops.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
