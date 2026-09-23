@@ -99,3 +99,55 @@ def test_check_divergence_silent_when_trends_agree():
         _entry("v2", 0.8, public_score=150),
     ]
     assert run_batch.check_divergence(entries) == []
+
+
+def test_run_batch_alternates_seats():
+    """Regression test: the two player slots are NOT symmetric -- running
+    v8 against a byte-identical copy of itself, player 0 won only 3 of 14
+    despite near-identical mean money, and a by-seat breakdown showed
+    3W-4L as player 0 vs 6W-2L as player 1. Measuring every season from
+    the same seat biased self-play win rates by roughly 30 points, more
+    than most real effects this harness is used to detect."""
+    seatings = []
+
+    class _FakeState:
+        def __init__(self, reward):
+            self.reward = reward
+            self.status = "DONE"
+
+    class _FakeEnv:
+        def run(self, agents):
+            seatings.append(list(agents))
+            # Constant rewards; we only care which slot the agent landed in.
+            self.steps = [[_FakeState(100.0), _FakeState(50.0)]]
+
+    with patch("kaggle_environments.make", lambda *a, **k: _FakeEnv()):
+        run_batch.run_batch("AGENT.py", "OPPONENT.py", seasons=4)
+
+    assert seatings[0] == ["AGENT.py", "OPPONENT.py"]
+    assert seatings[1] == ["OPPONENT.py", "AGENT.py"]
+    assert seatings[2] == ["AGENT.py", "OPPONENT.py"]
+    assert seatings[3] == ["OPPONENT.py", "AGENT.py"]
+
+
+def test_run_batch_scores_from_the_correct_seat_when_playing_as_player_1():
+    """When the agent is seated as player 1, the win/loss accounting must
+    read ITS reward, not player 0's."""
+
+    class _FakeState:
+        def __init__(self, reward):
+            self.reward = reward
+            self.status = "DONE"
+
+    class _FakeEnv:
+        def run(self, agents):
+            # player0 always scores 10, player1 always scores 999
+            self.steps = [[_FakeState(10.0), _FakeState(999.0)]]
+
+    with patch("kaggle_environments.make", lambda *a, **k: _FakeEnv()):
+        result = run_batch.run_batch("AGENT.py", "OPPONENT.py", seasons=2)
+
+    # Season 0: agent is player0 (scores 10) -> loss.
+    # Season 1: agent is player1 (scores 999) -> win.
+    assert result["wins"] == 1
+    assert result["losses"] == 1

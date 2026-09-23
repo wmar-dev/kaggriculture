@@ -585,6 +585,55 @@ changing the idea. Worth remembering for any future "tried it, didn't
 work" conclusion: check whether the test bench can even express the
 effect being looked for.
 
+## Harness correctness: the two player seats are not symmetric
+
+Found while testing whether GOOSE belonged in v8's diversification mix.
+The control variant -- byte-identical settings to v8 -- scored only 2 of
+12 against v8, which should have been a coin flip. That made the whole
+comparison suspect, so the control itself got checked:
+
+**v8 against a byte-identical copy of itself, player 0 won 3 of 14** --
+despite near-identical mean money (26,195 vs 25,949). A by-seat
+breakdown confirmed the direction: **3W-4L as player 0, 6W-2L as player
+1**. The means being equal while the win counts differ says player 1
+systematically takes the *narrow* games; player 0's wins come by larger
+margins. Over a season of thousands of market transactions, a tiny
+per-unit sequencing edge compounds into a consistent narrow-win bias.
+
+This is a harness-validity bug, not a game insight: `run_batch` always
+seated the agent under test as player 0, so **every self-play comparison
+this session carried a roughly 30-point win-rate bias** -- larger than
+most of the real effects the harness was being used to detect.
+
+**Fixed** by alternating seats (`evaluation/run_batch.py`): even-numbered
+seasons play the agent as player 0, odd-numbered as player 1, with the
+win/loss accounting reading whichever slot the agent actually occupied.
+Two regression tests cover the alternation order and the
+score-from-the-correct-seat accounting.
+
+**Re-validating the affected conclusions:**
+
+- **v8 vs v7 stands, and was understated.** The original 12W-0L was
+  measured from the *disadvantaged* seat. Re-measured seat-fair over 20
+  seasons: **17W-3L (85%)**, money 23,723 vs 17,555. A real, large win.
+- **The GOOSE question is now answered on valid evidence.** Against a
+  correct control (17-21% is the positional baseline, not 50%),
+  COW+SHEEP+GOOSE scored 2/12 -- i.e. no better than the control -- and
+  COW+GOOSE scored 1/12 with clearly worse money (20k vs 30k). GOOSE
+  stays out, now for a defensible reason rather than a bench-blind one.
+- **Results that measured ~40-50% vs an opponent may have been
+  understated**, since they were also measured from the weak seat. That
+  includes the RL policy's 42-50% (so "rough parity" may have been
+  slightly pessimistic, though not enough to change the conclusion) and
+  the rejected hold-through-the-crash experiment's 40%.
+
+Two bench-validity problems in a row now -- opponents that couldn't
+express the effect being tested (the diversification revert), and a
+seat bias larger than the effects being measured -- both of which
+produced confidently wrong conclusions from clean-looking numbers.
+Worth treating "the measurement might be the thing that's broken" as a
+first-class hypothesis whenever a result looks surprising.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

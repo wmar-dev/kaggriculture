@@ -48,16 +48,6 @@ def _latest_submission_path() -> Path:
     return versions[-1] / "main.py"
 
 
-def _final_money(env) -> tuple[float, float]:
-    """Final (player0, player1) money, per kaggriculture.json's reward
-    definition (player money at end of game) -- read straight from each
-    agent's terminal `reward` rather than re-deriving it from the farm
-    state.
-    """
-    final_state = env.steps[-1]
-    return final_state[0].reward, final_state[1].reward
-
-
 def _outcome(our_money: float, opp_money: float, our_status: str) -> str:
     if our_status not in ("DONE", "ACTIVE"):
         return "loss"  # crash/timeout/invalid forfeits the match
@@ -80,12 +70,26 @@ def run_batch(agent_path: str, opponent_name: str, seasons: int, config: dict | 
     our_money: list[float] = []
     opp_money: list[float] = []
 
-    for _ in range(seasons):
+    # Alternate seats. The two player slots are NOT symmetric: running
+    # v8 against a byte-identical copy of itself, player 0 won only 3 of
+    # 14 games despite near-identical mean money (26,195 vs 25,949) --
+    # player 1 systematically wins more of the narrow games. Measuring
+    # every season from the same seat therefore biases the win rate by
+    # roughly 30 points, which is larger than most of the real effects
+    # this harness is used to detect. Splitting seasons evenly between
+    # seats cancels it out.
+    for season in range(seasons):
+        we_are_player_0 = season % 2 == 0
         env = make("kaggriculture", configuration=cfg)
-        env.run([agent_path, opponent])
-        our, opp = _final_money(env)
-        our_status = env.steps[-1][0].status
-        outcome = _outcome(our, opp, our_status)
+        if we_are_player_0:
+            env.run([agent_path, opponent])
+            our_idx = 0
+        else:
+            env.run([opponent, agent_path])
+            our_idx = 1
+        final = env.steps[-1]
+        our, opp = final[our_idx].reward, final[1 - our_idx].reward
+        outcome = _outcome(our, opp, final[our_idx].status)
         wins += outcome == "win"
         losses += outcome == "loss"
         ties += outcome == "tie"
