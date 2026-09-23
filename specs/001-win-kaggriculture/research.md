@@ -691,6 +691,71 @@ intervention still worked -- which is a good argument for measuring the
 mechanism (wheat units bought) separately from the outcome (win rate),
 rather than assuming a win confirms the story that motivated it.
 
+## v9 was a regression: herd size, not feed cost, drives real results
+
+v9 won local self-play against v8 across three batches (65/60/57%) and
+then scored **363.3 against v8's 430.5** on the real leaderboard. Per
+Principle II that divergence had to be resolved before any further
+tuning, so it was, and the answer generalises.
+
+**Herd size is the dominant driver of real results.** Across all 43 real
+episodes played by v7, v8 and v9:
+
+| Our herd size | Games | Our mean money | Win rate |
+| --- | --- | --- | --- |
+| 7-8 | 21 | 28,253 | 24% |
+| 9-10 | 14 | 35,432 | 57% |
+| 11+ | 7 | 49,995 | **71%** |
+
+Opponents show the same pattern (animal-free opponents average 21,104;
+those running 7+ animals average 49-57k). And v9's median herd was
+**7 against v8's 9** -- growing its own feed costs the farmer's turns,
+the farmer is the only worker on high-value crops, and that income is
+what funds reinvestment. v9 traded the thing that matters for the thing
+that doesn't.
+
+*Caveat worth stating*: this is a correlation, and causation plausibly
+runs both ways -- a game going well affords more animals. The v9
+comparison is the stronger evidence, since it shrank the herd *by
+design* and underperformed.
+
+**Why local evaluation couldn't see it.** Self-play against our own
+previous version pits two agents of the *same scale* against each other,
+so feed-cost efficiency decides the match. The real field contains
+opponents running 12-28 animals, where scale decides instead. Third
+instance this session of the bench failing to represent the real
+opponent distribution.
+
+**An attempted rescue, also rejected.** Since 39% of all hand-turns were
+PASS (1,840 of 4,707 in a measured game), idle hands were routed onto
+wheat so feed could be grown without taxing the farmer. The labour did
+get used (PASS fell to 0.1%) and herd size was preserved (11 vs v8's
+10), but wheat purchases went *up*, not down: the greedy nearest-tile
+logic plants instantly and has to walk to water, so it planted 176 wheat
+against only 70 waterings, leaving 11 tiles of weeds (unwatered plants
+die). Capping plantings to the herd's actual need helped the weeds
+(11 -> 6) but not the purchases (173 -> 156, against v9's 61). Reverted.
+
+**Outcome**: v8 is restored as the recommended submission.
+
+### Harness: stale scores are not comparable across versions
+
+Fixing the above surfaced two more ranking defects, both now fixed and
+regression-tested:
+
+1. When two candidates *both* have real leaderboard scores, that direct
+   comparison should outrank any local proxy. Ranking previously used
+   local signals only -- a deliberate earlier fix, because letting *any*
+   stale real score outrank an untested newer version had kept
+   recommending a known-weak v2 over v3. Requiring **both** sides to have
+   real evidence keeps the useful case without reviving the broken one.
+2. Applying that immediately recommended v6, because the log stored each
+   score as read *at submission time* -- and scores converge downward as
+   episodes accumulate (v6 read 448.6 fresh, 406.4 now). Snapshots taken
+   at different times are not comparable to each other. All scores were
+   re-read in a single pass and re-logged, so the comparison is
+   apples-to-apples.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

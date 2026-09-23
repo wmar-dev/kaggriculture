@@ -186,3 +186,32 @@ def test_rank_does_not_promote_a_version_that_lost_its_head_to_head():
         {"opponent": "submissions/v3/main.py", "win_rate": 0.25, "mean_money": 9000, "opponent_mean_money": 30000}])
     ranked = select_final.rank_candidates([incumbent, challenger])
     assert ranked[0]["agent_version"] == "v3"
+
+
+def test_real_leaderboard_scores_decide_when_both_versions_have_them():
+    """v9 beat v8 57-65% in local self-play but scored 363.3 against v8's
+    430.5 on the real leaderboard (v9's feed-growing shrinks the herd,
+    and herd size drives real results). When BOTH candidates have real
+    scores, that direct comparison must outrank the local proxy."""
+    fixed = [{"opponent": n, "win_rate": 1.0, "mean_money": 40000, "opponent_mean_money": 3000}
+             for n in ("random", "starter", "greedy")]
+    older = _entry_with_opponents("v3", list(fixed))
+    older["kaggle_result"] = {"public_score": 430.5}
+    newer = _entry_with_opponents("v4", fixed + [
+        {"opponent": "submissions/v3/main.py", "win_rate": 0.65, "mean_money": 27000, "opponent_mean_money": 24000}])
+    newer["kaggle_result"] = {"public_score": 363.3}
+    ranked = select_final.rank_candidates([older, newer])
+    assert ranked[0]["agent_version"] == "v3"
+
+
+def test_local_evidence_still_wins_when_the_newer_version_is_untested():
+    """The narrower rule must not resurrect the old bug where any stale
+    real score outranked an untested but locally-dominant newer version."""
+    fixed = [{"opponent": n, "win_rate": 1.0, "mean_money": 40000, "opponent_mean_money": 3000}
+             for n in ("random", "starter", "greedy")]
+    older = _entry_with_opponents("v3", list(fixed))
+    older["kaggle_result"] = {"public_score": 430.5}
+    newer = _entry_with_opponents("v4", fixed + [
+        {"opponent": "submissions/v3/main.py", "win_rate": 0.8, "mean_money": 30000, "opponent_mean_money": 20000}])
+    ranked = select_final.rank_candidates([older, newer])  # newer has no real score yet
+    assert ranked[0]["agent_version"] == "v4"

@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
+from functools import cmp_to_key
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -146,6 +147,33 @@ def _sort_key(entry: dict) -> tuple:
     )
 
 
+def _compare_candidates(a: dict, b: dict) -> int:
+    """Order two candidates, newest-best first.
+
+    When BOTH have a real Kaggle `public_score`, that head-to-head on the
+    actual leaderboard outranks every local signal -- local evaluation is
+    a proxy, and two real scores are a direct comparison of the thing we
+    actually care about. (This is narrower than an earlier version of
+    this ranking, which let ANY stale real score outrank an untested but
+    locally-dominant newer version; that was wrong, and it kept
+    recommending a known-weak v2 over v3. Requiring *both* sides to have
+    real evidence keeps the useful case without the broken one.)
+
+    It matters here: v9 beat v8 57-65% in local self-play but scored
+    363.3 against v8's 430.5 on the real leaderboard, because v9's
+    feed-growing shrinks the herd -- and across 43 real episodes our herd
+    size tracks results hard (herd 7-8: 24% win rate; 9-10: 57%; 11+:
+    71%). Local self-play against our own previous version couldn't see
+    that, because both sides were the same scale.
+    """
+    a_real = (a.get("kaggle_result") or {}).get("public_score")
+    b_real = (b.get("kaggle_result") or {}).get("public_score")
+    if a_real is not None and b_real is not None and a_real != b_real:
+        return 1 if a_real > b_real else -1
+    ka, kb = _sort_key(a), _sort_key(b)
+    return (ka > kb) - (ka < kb)
+
+
 def rank_candidates(entries: list[dict]) -> list[dict]:
     """Best candidate first, ranked by local win-rate then by average
     money margin.
@@ -165,7 +193,7 @@ def rank_candidates(entries: list[dict]) -> list[dict]:
     competitor's own judgment.
     """
     candidates = _latest_per_version(entries)
-    return sorted(candidates, key=_sort_key, reverse=True)
+    return sorted(candidates, key=cmp_to_key(_compare_candidates), reverse=True)
 
 
 def format_recommendation(entry: dict) -> str:
