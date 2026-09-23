@@ -521,6 +521,70 @@ project, not a continuation of this one. v7 remains the submitted/
 recommended agent; the RL exploration ends here for this session with
 an honest "matched, didn't beat" result.
 
+## v8: diversify animals as a hedge against milk-market collapse
+
+Went back to replay analysis -- the technique that produced every real
+breakthrough this session -- on v7's 17 played Kaggle episodes.
+
+**Record**: 8W-9L, our mean 30,909 vs the field's 29,200 -- essentially
+even with the field, a big step up from v3's 6W-12L. But the
+*distribution* was the finding: every win scored 28k-60k, while six of
+nine losses scored under 25k (one as low as 1,664). The remaining lever
+was never our ceiling -- it was our floor.
+
+**Cause, found by cross-referencing every replay's final state**:
+
+| Outcome | Opponent's cows | End-of-season MILK price | Our money |
+| --- | --- | --- | --- |
+| all 8 wins | 0-1 | 207-305 | 28k-60k |
+| 8 of 9 losses | 6-13 | 11-137 | 1.6k-30k |
+
+The correlation is near-perfect. Our economy was ~100% milk-driven, and
+MILK has one of the harshest glut curves in the game (`above_target`
+1.60 -- CONTEST.md warns premium goods "drive straight to the $1 floor"
+on modest gluts). An opponent who also farms cows floods the shared
+market and collapses our entire revenue stream. Two further losses had
+milk at 36-38 against an animal-free opponent -- i.e. we crashed our own
+price by overproducing, unaided.
+
+**First attempt, rejected**: hold premium stock through the crash rather
+than dumping into it (with shed-pressure and end-of-season escape
+valves, since unsold inventory is worth $0 at the end). Measured at 40%
+win rate vs v7, money slightly *behind* -- no help. The reason is
+instructive: in a glut driven by a *competitor* the price never
+recovers, because they keep selling while we sit on stock. You cannot
+wait out a flood you do not control.
+
+**What worked**: diversify production itself. Buy COW or SHEEP based on
+each product's *current* price relative to base, divided by a
+`1 + already owned` penalty. The price ratio is what makes it a hedge --
+once milk trades far below base (whoever caused it), WOOL automatically
+becomes the better buy, so new capital stops compounding a collapsing
+revenue stream. Restricted deliberately to COW and SHEEP: both use the
+same PASTURE structure (no second structure type to coordinate), and
+SHEEP's `interval=3` needs *fewer* harvest visits than COW's
+`interval=2`.
+
+**Results** (bundled submission, 12 seasons/opponent): 100% vs
+random/starter/greedy at ~40-49k, and **100% vs v7** (12W-0L, 27,574 vs
+16,774). Two earlier dev-version batches both measured 80% vs v7 (16W-4L
+then 12W-3L, combined 28W-7L) with no regression against the fixed
+opponents. The largest win since v6.
+
+**The methodological lesson is the real takeaway.** An earlier
+diversification attempt was tried and *reverted* (see the
+reverted-diversification note above) after measuring a severe regression
+-- but that was measured against `random`/`starter`/`greedy`, **none of
+which farm animals at all**. Those opponents never compete for the milk
+market, so a hedge against milk collapse could only ever look like pure
+cost there. The evaluation bench was structurally incapable of revealing
+the value of the very thing being tested, and a genuinely good idea was
+discarded on that evidence. The fix that finally surfaced it was
+changing *what we evaluated against* (v7, which farms cows), not
+changing the idea. Worth remembering for any future "tried it, didn't
+work" conclusion: check whether the test bench can even express the
+effect being looked for.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
