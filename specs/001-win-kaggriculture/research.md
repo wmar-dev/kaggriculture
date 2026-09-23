@@ -845,6 +845,53 @@ have -- assigning each hand a stable plot, rather than every hand
 re-deciding for the nearest needy tile each turn. That's a different
 design, not a tweak, and it is where this thread stops.
 
+## v11: stop buying land we never use
+
+Switched from the cost side to the income side and measured, for the
+first time, **where the money actually comes from** in a full game:
+
+| Product | Units sold | Gross revenue | Price at season end |
+| --- | --- | --- | --- |
+| MILK | 130 | 30,400 (62%) | 278 (base 160 -- healthy) |
+| FERTILIZER | 176 | 11,629 (24%) | 30 (free: collected from animals) |
+| WOOL | 57 | 6,340 (13%) | **5** (base 200 -- cratered) |
+| WHEAT | 25 | 939 | 52 |
+
+**A tempting misreading, and the correction.** Wool cratering to 5 while
+milk held at 278 looked like the forced diversification penalty
+(`/ 1 + owned`) was buying sheep we didn't need. Removing it, so price
+ratio alone drove animal choice, measured **30%** against v10 -- clearly
+worse. The reason is that the hedge has to be *pre-positioned*: animals
+take 6-8 days to first yield, so by the time the price signal says milk
+is collapsing it is far too late to start a sheep pipeline. Insurance
+has to be bought before the fire. v8's diversification was right, for a
+subtler reason than originally recorded.
+
+**What the cost side did reveal.** Gross revenue of 49,308 against
+33,935 final money means ~15k goes to costs, and the single largest line
+is **land: 7,000 for three extra quadrants**. A measured game ended with
+all four quadrants bought and only **27 of 100 tiles occupied** (weeds
+included) -- 73 empty. Land was never the constraint; feeding throughput
+is (see the previous section).
+
+Swept directly against v10, 16 seasons per setting:
+
+| Quadrants bought | Result vs v10 |
+| --- | --- |
+| 1 | 25% (genuinely too little land) |
+| 2 | 62% |
+| **3** | **100% (16W-0L)** |
+| 4 (v10's behaviour) | control |
+
+Three reproduced at 75% and 90% over two further 20-season batches
+(combined 49W-7L). The fourth quadrant alone costs 4,000 -- more than
+the first two together -- for tiles that sit empty, and end-of-season
+money *is* the score.
+
+**Results** (bundled, 14 seasons/opponent): 100% vs random/starter/greedy
+at **48-55k** (v10 managed 42-49k), and **93% vs v10** (13W-1L, 27,697
+against 23,896).
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
