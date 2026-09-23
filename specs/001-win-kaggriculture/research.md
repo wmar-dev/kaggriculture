@@ -756,6 +756,47 @@ regression-tested:
    re-read in a single pass and re-logged, so the comparison is
    apples-to-apples.
 
+## v10: stop paying for animals that never reach a pasture
+
+Chasing the herd-size lever surfaced a concrete leak. Tracing herd size
+per day showed it growing to 9 by day 12, dropping to 7, and then
+sitting at **exactly 7 for the final 17 days with two built pastures
+standing empty** -- while 17 animals had been purchased in total.
+
+The shed explained it: from day 10 onward **8 animals (3 COW + 5 SHEEP,
+~3,700) sat in the shed, never collected**. Cause: hands prioritise
+feeding over collecting a new animal (added in v3, correctly -- an unfed
+animal escapes permanently). But every animal is unfed at dawn, so once
+the herd is large enough that *someone* is always unfed when a hand
+reaches the shed, wheat always wins and the waiting animal is never
+picked up. Worse, pending animals count toward `MAX_STRUCTURES`, so
+7 placed + 8 pending = 15 also jammed the purchase gate shut.
+
+**The obvious fix made things dramatically worse.** Letting hands
+collect the stranded animals grew the herd to 12 and measured
+**0W-20L** against v8. Gating expansion on the herd being fed on
+schedule still measured **1W-19L**. The strandings had been accidentally
+load-bearing: beyond roughly seven animals the marginal animal costs
+more in feed -- bought at a price our own buying inflates -- than its
+product earns into a market we are simultaneously glutting.
+
+**That also resolves the previous section's caveat.** The herd-size
+correlation (herd 11+ winning 71%) really was mostly reverse causation:
+a game going well affords more animals. Forcing the herd higher
+*causally* collapses the economy. Worth remembering as a case where
+acting on a correlation would have been actively harmful, and only the
+intervention test distinguished the two.
+
+**The actual fix** is therefore not to place the stranded animals but to
+never buy them: don't purchase while one is still pending. The herd
+ceiling stays exactly where it was; the wasted ~3,700 does not.
+Purchases fell from 17 to 11 (7,300 -> 4,900) with the herd unchanged at
+7 and nothing stranded.
+
+**Results** (bundled, 14 seasons/opponent): 100% vs
+random/starter/greedy at 42-49k, and **100% vs v8** (14W-0L, 32,111 vs
+23,630). Two dev batches measured 90% and 85%.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
