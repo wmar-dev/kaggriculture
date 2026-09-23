@@ -155,3 +155,34 @@ def test_mark_final_appends_a_decision_record(tmp_path):
     assert entries[-1]["decision"] == "adopt"
     assert entries[-1]["agent_version"] == "v1"
     assert "best local win-rate" in entries[-1]["hypothesis"]
+
+
+def test_rank_prefers_newer_version_when_reference_bench_is_saturated():
+    """Regression test: once every candidate beats the fixed bench 100%,
+    that bench has stopped discriminating. Ranking then fell through to
+    money margin against those same saturated opponents and put v8 above
+    v9 -- even though v9 beat v8 directly across three batches."""
+    fixed = [{"opponent": n, "win_rate": 1.0, "mean_money": m, "opponent_mean_money": 3000}
+             for n, m in (("random", 49000), ("starter", 39000), ("greedy", 43000))]
+    older = _entry_with_opponents("v3", fixed + [
+        {"opponent": "submissions/v2/main.py", "win_rate": 1.0, "mean_money": 27000, "opponent_mean_money": 16000}])
+    # Newer wins its head-to-head, but by a slimmer margin against a much
+    # stronger predecessor, and with lower money vs the weak bench.
+    newer_fixed = [{"opponent": n, "win_rate": 1.0, "mean_money": m, "opponent_mean_money": 3000}
+                   for n, m in (("random", 35000), ("starter", 41000), ("greedy", 40000))]
+    newer = _entry_with_opponents("v4", newer_fixed + [
+        {"opponent": "submissions/v3/main.py", "win_rate": 0.57, "mean_money": 26000, "opponent_mean_money": 23000}])
+    ranked = select_final.rank_candidates([older, newer])
+    assert ranked[0]["agent_version"] == "v4"
+
+
+def test_rank_does_not_promote_a_version_that_lost_its_head_to_head():
+    """A version measured head-to-head and beaten should not outrank the
+    predecessor it failed against, however new it is."""
+    fixed = [{"opponent": n, "win_rate": 1.0, "mean_money": 40000, "opponent_mean_money": 3000}
+             for n in ("random", "starter", "greedy")]
+    incumbent = _entry_with_opponents("v3", list(fixed))
+    challenger = _entry_with_opponents("v4", fixed + [
+        {"opponent": "submissions/v3/main.py", "win_rate": 0.25, "mean_money": 9000, "opponent_mean_money": 30000}])
+    ranked = select_final.rank_candidates([incumbent, challenger])
+    assert ranked[0]["agent_version"] == "v3"

@@ -634,6 +634,63 @@ produced confidently wrong conclusions from clean-looking numbers.
 Worth treating "the measurement might be the thing that's broken" as a
 first-class hypothesis whenever a result looks surprising.
 
+## v9: grow the herd's feed instead of buying it
+
+Replay analysis of v8's 19 real episodes, now on a trustworthy harness:
+**8W-11L, our mean 34,488 vs the field's 43,248.** We improved on v7
+(30,909) but *the field improved faster* (29,200 -> 43,248 in two days)
+-- worth noting that a static agent loses ground here even when it isn't
+getting worse.
+
+The failure pattern had shifted away from price crashes (v8's fix
+worked -- we now reliably win at high milk prices, taking 5 of 8 wins
+against animal-free opponents). The new binding constraint was **scale**:
+v8 stalls around 10 animals while the strong opponents run **17-28**
+(`COW:12 + SHEEP:8`, `COW:8 + SHEEP:20`).
+
+**Two hypotheses tested and rejected first**, both worth recording
+because they were the obvious guesses:
+
+- *Reinvestment pace is mistuned for a contested market.* `REINVEST_RESERVE`
+  had been tuned against `starter` (animal-free, no market competition),
+  so this looked like another bench-blindness case. Re-swept against v8
+  on the seat-fair harness: 1.25 and 1.5 are catastrophic (0/16), 2.5 is
+  worse, and **2.0 remains the optimum**. The original tuning was robust
+  after all.
+- *The ceilings are binding.* Opponents exceed `MAX_STRUCTURES=15`
+  outright, so raising it looked necessary. Raising both caps made
+  things strictly **worse** (15/15 -> 12%, 25/25 -> 12%, 40/40 -> 6%,
+  money 27k -> 20k -> 17.6k) -- it just reproduces the v6-era
+  over-extension failure. The ~10-animal plateau is self-imposed by the
+  loop's own economics, not by the caps.
+
+**What the measurement actually showed.** Instrumenting a single game:
+v8 bought **143 units of wheat for ~5,855 -- about 39% of that game's
+final money** -- and its own buying drained market inventory enough to
+drive the wheat price from its base of 25 up to **50** (WHEAT's
+`below_func` is `sqrt` at `below_target` 0.80, so scarcity bites hard).
+Feed cost per animal therefore *rises* with herd size: a self-inflicted
+brake on precisely the scaling we were trying to achieve.
+
+**Fix**: when the herd's wheat buffer is thin (`< herd * FEED_BUFFER_DAYS`),
+plant WHEAT regardless of what the value-ranked crop choice prefers. A
+wheat seed costs 10 and yields 4-6 units (~2.5/unit against a market
+price of 25-50/unit), and growing it *adds* supply instead of draining
+it.
+
+**Results**: wheat purchases fell from 143 units (~5,855) to 61
+(~2,363), a 58% cut. Three batches vs v8: **65%, 60%, 57%** (combined
+33W-21L, 61%), with 100% vs random/starter/greedy at 36-42k and no
+regression anywhere.
+
+**Worth noting the hypothesis was half wrong.** The theory was that
+cheaper feed would unlock a *bigger* herd; herd size didn't actually
+grow (one instrumented game ran 6 animals against v8's 10). The gain is
+pure cost reduction, not scale. The prediction was wrong while the
+intervention still worked -- which is a good argument for measuring the
+mechanism (wheat units bought) separately from the outcome (win rate),
+rather than assuming a win confirms the story that motivated it.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

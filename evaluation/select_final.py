@@ -98,8 +98,52 @@ def _avg_money_margin(entry: dict) -> float:
     return sum(margins) / len(margins)
 
 
+def _self_play_win_rate(entry: dict) -> float | None:
+    """Win rate against another submission bundle (a path-shaped opponent
+    name), or None when the version was never tested head-to-head."""
+    results = [
+        r for r in (entry.get("evaluation_results") or [])
+        if "/" in r["opponent"] or r["opponent"].endswith(".py")
+    ]
+    if not results:
+        return None
+    return sum(r["win_rate"] for r in results) / len(results)
+
+
+def _earned_promotion(entry: dict) -> int:
+    """1 unless the version was measured head-to-head and LOST.
+
+    Raw self-play rates aren't comparable across versions -- each faces a
+    different predecessor, so v8 beating the weaker v7 100% scores higher
+    than v9 beating the stronger v8 at 57%, even though v9 is the better
+    agent. What *is* comparable is the binary: did this version beat the
+    thing it was built to replace? A version that failed that test
+    shouldn't outrank its own predecessor.
+    """
+    rate = _self_play_win_rate(entry)
+    return 1 if rate is None or rate >= 0.5 else 0
+
+
+def _version_number(entry: dict) -> int:
+    name = entry.get("agent_version", "")
+    digits = name[1:] if name.startswith("v") else name
+    return int(digits) if digits.isdigit() else -1
+
+
 def _sort_key(entry: dict) -> tuple:
-    return (_reference_win_rate(entry), _avg_money_margin(entry))
+    # Reference win-rate first. Then "did it earn its promotion
+    # head-to-head", then version number -- because once every candidate
+    # beats the weak bench 100%, that bench has stopped discriminating,
+    # and money margin against those same saturated opponents is noise
+    # (it ranked v8 above v9 despite v9 beating v8 directly across three
+    # batches). Money margin stays as a last resort for candidates that
+    # are otherwise indistinguishable.
+    return (
+        _reference_win_rate(entry),
+        _earned_promotion(entry),
+        _version_number(entry),
+        _avg_money_margin(entry),
+    )
 
 
 def rank_candidates(entries: list[dict]) -> list[dict]:
