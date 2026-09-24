@@ -892,6 +892,45 @@ money *is* the score.
 at **48-55k** (v10 managed 42-49k), and **93% vs v10** (13W-1L, 27,697
 against 23,896).
 
+## v12: drop crop farming entirely; the farmer joins the herd
+
+A full spending audit (final money 45,215 against gross revenue 57,648,
+so ~13k of costs) put the categories at: animals 4,700, feed 3,815, land
+3,000, **seeds 1,400**, hires ~990. Cross-referencing that against the
+revenue audit was the tell -- the crop side earned **~939, all of it
+wheat**, with literally zero carrot / tomato / strawberry / melon
+revenue, against 1,400 spent on seeds.
+
+**The crops were being planted and then left to die.** Every game ended
+with 9-14 weed tiles. Watering requires travel, planting is instant, and
+the greedy per-unit loop kept re-targeting the nearest needy tile rather
+than maintaining what it had already planted -- the same coordination
+failure that defeated three separate attempts at feed self-sufficiency.
+Rather than attempt that fix a fourth time, the crops go.
+
+Measured against v11, 20 seasons per variant, bundled (not monkeypatched
+-- an earlier monkeypatched reading of variant B was badly misleading at
+75%):
+
+| Variant | vs v11 | head-to-head |
+| --- | --- | --- |
+| A: no crops, farmer left idle | 95% | -- |
+| **B: no crops, farmer on animal duty** | **85%** | **90% vs A** (43,457 vs 34,535) |
+
+B wins decisively despite the lower headline number against v11, because
+the two variants were measured against different things -- the
+head-to-head is what separates them. The farmer is worth far more as an
+extra pair of hands on the herd than as a crop grower.
+
+`_decide_unit_action`, `_find_nearest_tile` and `_tile_needs_attention`
+became unreferenced and were removed. `choose_best_crop`,
+`_count_growing_crops` and `_is_harvest_ready` stay: `training/` and the
+`greedy` reference opponent still use them.
+
+**Results** (bundled, 14 seasons/opponent): 100% vs random/starter/greedy
+at **58-66k** (v11 managed 48-55k), and **93% vs v11** (13W-1L, 33,803
+against 28,725).
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

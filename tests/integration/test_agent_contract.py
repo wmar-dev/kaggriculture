@@ -109,7 +109,7 @@ def test_agent_stays_within_internal_per_turn_time_budget():
     """research.md R1: designed against an internal <=50ms/turn budget,
     a large safety margin under the confirmed real actTimeout of 1s.
     Measured across a real (short) episode, not synthetic obs, so board
-    scans (e.g. _find_nearest_tile) run against a realistically populated
+    scans (e.g. the animal-tile searches) run against a realistically populated
     farm rather than an empty one.
     """
     import time
