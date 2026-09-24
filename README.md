@@ -30,6 +30,18 @@ make leaderboard # check the leaderboard
 `make submit` is the one command that actually spends a Kaggle submission —
 it shows you what it's about to do and asks for confirmation first.
 
+### Submission budget
+
+Kaggle allows **5 submissions per day** for this competition, and unused
+slots do not carry over. `make submit` reports how many you've used
+before asking for confirmation (spec FR-004 requires tracking this).
+
+The day boundary is **UTC, not local time** — which is easy to get
+wrong: on a local evening the UTC day may already have rolled over, so
+submissions that feel like "today" are counted against yesterday's
+budget and you have more left than you think. The counter in
+`make submit` uses UTC for this reason.
+
 ## Layout
 
 - `src/kaggriculture_agent/` — the agent (`agent.py` is the Kaggle

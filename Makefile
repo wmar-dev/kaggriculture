@@ -6,6 +6,12 @@ PIP     := $(VENV)/bin/pip
 KAGGLE  := $(VENV)/bin/kaggle
 
 SEASONS ?= 20
+
+# Kaggle allows 5 submissions per day for this competition (spec FR-004
+# requires tracking this). The counter below matches submissions by UTC
+# date, since Kaggle's day boundary is UTC, not local time. Unused slots
+# do not carry over.
+DAILY_SUBMISSION_CAP ?= 5
 RECOMMENDED := $(shell $(PY) evaluation/select_final.py 2>/dev/null | sed -n 's/^Recommended final: \([^ ]*\).*/\1/p')
 VERSION ?= $(RECOMMENDED)
 MSG     ?= $(VERSION) -- see experiments/log.jsonl for evaluation results
@@ -51,6 +57,14 @@ submit:
 	@$(PIP) show kaggle >/dev/null 2>&1 || $(PIP) install --quiet kaggle
 	@echo "About to submit: submissions/$(VERSION)/main.py"
 	@echo "Message: $(MSG)"
+	@used=$$($(KAGGLE) competitions submissions kaggriculture 2>/dev/null | grep -c "$$(date -u +%Y-%m-%d)" || true); \
+		left=$$(( $(DAILY_SUBMISSION_CAP) - $$used )); \
+		echo "Daily budget: $$used/$(DAILY_SUBMISSION_CAP) used today (UTC), $$left remaining"; \
+		if [ "$$used" -ge "$(DAILY_SUBMISSION_CAP)" ]; then \
+			echo "  WARNING: daily cap appears to be reached -- Kaggle will likely reject this."; \
+		elif [ "$$left" -le 1 ]; then \
+			echo "  NOTE: this is your last submission today. Unused slots do not carry over."; \
+		fi
 	@read -p "Submit to Kaggle now? [y/N] " ans; \
 		case "$$ans" in [yY]) ;; *) echo "Aborted."; exit 1;; esac
 	$(KAGGLE) competitions submit kaggriculture -f submissions/$(VERSION)/main.py -m "$(MSG)"
