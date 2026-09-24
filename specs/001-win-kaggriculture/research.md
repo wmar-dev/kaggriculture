@@ -963,6 +963,110 @@ longer time to sell what it produces.
 at **61-70k** (v12 managed 58-66k), and **79% vs v12** (11W-3L). Two dev
 batches measured 80% and 95%.
 
+## Post-v13: four negative results, and where the real constraint is
+
+v12 scored **537.8** on the real leaderboard -- far above v10 (454.7) and
+v11 (440.1), and the largest single jump of the project. With that number
+in hand, v13 (already 79% vs v12 locally) is clear to submit.
+
+Four attempts to improve on v13 were measured head-to-head against the
+v13 bundle. **All four lost.** They are recorded here because each one
+rules out a plausible-sounding direction.
+
+### Market structure: how prices actually move
+
+Worth stating once, since three of the four experiments turned on it.
+Market inventory starts at I0 and rises with every unit sold; the ONLY
+thing that ever removes stock is `_town_consume`. So:
+
+- **FERTILIZER has no buyer at all.** No shop lists it and it is excluded
+  from `TOWN_CENTER_PRODUCTS`, so its price falls monotonically to the
+  floor: measured 100 -> 96 -> 87 -> 67 -> 43 -> 19 -> 1 over one season.
+- **MILK, by contrast, ends ABOVE base** (226 vs a base of 160) even in
+  self-play with two full herds selling into it -- town demand for milk
+  outruns what two farms produce.
+- Shops are drawn **with replacement** from a pool of 8, so demand is
+  re-rolled every episode. Over 20k simulated draws: **34% of episodes
+  unlock no YARN_STORE at all**, leaving WOOL only the town centre's
+  1 unit per 24 steps, while in **40%** wool demand beats milk.
+
+### 1. Demand-aware animal choice (12W/18L, 40%)
+
+Since the shop draw is observable and swings wool demand that hard,
+`choose_target_animal` was weighted by the town's expected consumption
+rate, blending observed shop instances with the prior over shops not yet
+unlocked. It lost. v8's price-ratio hedge already captures what is
+capturable here -- price *is* the demand signal, just lagged.
+
+### 2. Return-on-capital animal valuation (5W/25L, 17%)
+
+Replacing the price ratio with true marginal return per dollar
+(`price / interval / cost`, which correctly rates a COW at 0.20/$/day
+against a SHEEP's 0.13) produced an all-cow herd and lost badly. **The
+reasoning optimised the wrong scarce resource**: capital is not scarce
+here, hand-turns are, and SHEEP's interval=3 needs fewer harvest visits
+than COW's interval=2. v13's mixed herd is a labour decision wearing a
+market decision's clothes.
+
+### 3. Unsticking the pending animal (0W/20L, 0%)
+
+A bought animal only leaves the shed if a unit happens to stand on a shed
+tile while NO animal is unfed -- and past a certain herd size someone is
+always unfed at dawn. Measured on v13: **an animal sat unplaced for 78%
+of all turns**, and since `_market_orders` refuses to buy while one is
+pending, the herd froze at 12-13 from day 13 onward while the bank
+climbed from 3,950 to 46,789. That looks exactly like ~43k of dead
+capital.
+
+It is not. Dedicating exactly one unit (the one nearest the shed) to
+placement duty, leaving every other unit's feed-first priority untouched,
+cleared the stall -- the herd reached 14 -- and lost **every single game**,
+22,323 vs 43,748.
+
+**The stall is load-bearing.** It is an accidental brake that holds the
+herd at its feed equilibrium, and this is the second time the same brake
+has been removed and measured at 0W-20L (see v10's note on stranded
+animals). The unspent 43k is not idle capital; it is capital with nothing
+productive to buy.
+
+Two implementation bugs were found and fixed along the way, both worth
+remembering: a duty unit that yields to `claimed` never reaches the shed,
+because shed tiles are the busiest squares on the board; and
+`_step_toward(pos, pos)` returns PASS, so routing a unit that is *already*
+standing on the shed parks it on top of the animal (455 turns, in the
+first version of the fix).
+
+### 4. Batched wheat pickup (best 9W/11L, 45%)
+
+Diagnosing constraint #3 gave a sharper reading of what actually binds.
+At day 18 of one game: **15 animals, 6 of them unfed, and 10 WHEAT
+sitting unused in the shed.** Not wheat, not money -- feeding *logistics*.
+And the engine puts **no carry limit on PICKUP** (`n` is bounded only by
+shed stock), yet v2-v13 always take exactly 1, so feeding one animal
+costs a full round trip to the shed.
+
+Batching the pickup lost anyway, and monotonically worse with batch size:
+2 -> 35%, 3 -> 45%, 4 -> 30%, 6 -> 15%. Wheat held in a unit's inventory
+is wheat the shed cannot hand to anyone else, so hoarding it just moves
+the shortage around.
+
+### Reading
+
+v13 looks like a genuine local optimum: every perturbation tried here
+made it worse, and the two independent 0W-20L results say the herd is
+already sitting at the equilibrium its feed logistics can support.
+Growing it needs the *logistics* fixed first, and batching -- the obvious
+lever -- is not the fix. Note the standing caveat that this bench is
+self-play against v13, which is known to be blind to scale effects.
+
+### Harness bug found
+
+`--opponents previous` resolves to the **latest** `submissions/vN/`, so
+bundling a candidate and then evaluating it against `previous` silently
+pits the candidate against **itself**. Two runs were wasted on this (they
+showed 15-18 ties out of 24-30, which is the tell). Head-to-head runs
+should name the baseline explicitly: `--opponents submissions/v13/main.py`.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
