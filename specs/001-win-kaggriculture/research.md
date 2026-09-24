@@ -1508,6 +1508,82 @@ very unlikely to come from further self-play-guided tuning.
 65% (true 53%), 60% (true 36%) and 45% for a change that was really
 57%. They screen out losers. They decide nothing.
 
+## Real match data: what the field actually does
+
+Kaggle's episode API turns out to be queryable for this competition and
+settles several questions that self-play could not. Competition id
+**147734**; `POST https://www.kaggle.com/api/i/competitions.EpisodeService/ListEpisodes`
+with `{"submissionId": <id>}` (that exact field -- `teamId`/`teamIds`
+are rejected with "You must specify at least one ID filter"). Auth is
+the CLI's OAuth access token via
+`KaggleApi().get_config_value("token")` as a bearer header. The response
+carries `episodes`, `submissions` and `teams`, and every episode lists
+BOTH agents with their `reward` (final money), `initialScore` and
+`updatedScore` -- so opponents can be discovered by crawling outward
+from our own episodes. `GetEpisodeReplay` returns 404, so actions are
+not available, only outcomes.
+
+### Our improvements DO transfer -- the rating just cannot show it
+
+| version | eps | W-L | win rate | our money | opp money | delta |
+|---|---|---|---|---|---|---|
+| v8 | 18 | 8-10 | 44% | 34,752 | 43,993 | **-9,241** |
+| v10 | 21 | 10-11 | 48% | 40,894 | 45,688 | -4,794 |
+| v11 | 21 | 9-12 | 43% | 42,988 | 51,083 | -8,095 |
+| v12 | 17 | 7-10 | 41% | 46,632 | 50,230 | -3,598 |
+| v13 | 24 | 11-13 | 46% | 47,745 | 55,283 | -7,538 |
+| v15 | 26 | 12-14 | 46% | **51,811** | 51,051 | **+760** |
+
+This corrects the previous section's conclusion. Local self-play is NOT
+simply overstating the gains: measured against the real field, our money
+improved from a 9,241 deficit to a small surplus, tracking the local
+work. What stays flat is the WIN RATE (41-48% throughout), because
+matchmaking pairs similar-rated agents -- as we improve we are served
+harder opponents, so win rate is pinned near 50% by construction and
+the rating moves only slowly. Self-play's real limitation is that it
+measures a moving target, not that it measures nothing.
+
+### The gap is production scale, and it is large
+
+Crawling outward three hops (3,856 agents discovered) reaches the top of
+the leaderboard:
+
+| agent | score | episodes | mean reward | max reward |
+|---|---|---|---|---|
+| 55309130 | 3058 | 69 | **126,070** | 173,179 |
+| 55304513 | 3034 | 103 | 123,534 | 183,993 |
+| 55317832 | 3034 | 114 | 104,804 | 178,305 |
+| **v15 (ours)** | **470** | 26 | **51,811** | -- |
+
+One observed episode: **48,052 vs 173,179**. The leaders bank roughly
+**2.5x** what we do. That is a production gap, not a tactical one.
+
+### What that implies
+
+We sell **three** products: MILK, WOOL and FERTILIZER. At
+MAX_STRUCTURES the first two saturate their town demand and crash (MILK
+ends at price 1), which is exactly why raising the herd cap loses. The
+market has **nine** products, each with its own independent demand curve
+and its own glut threshold. Saturating two of them caps us near 50k --
+which is precisely where we sit.
+
+**This reframes the crop work.** v12 dropped crops because they were
+net-negative *when the animal economy still had headroom*, and today's
+stable-plot design was rejected for the same reason: hand-turns were
+worth more on animals. Both judgements were correct at the time and are
+now obsolete -- the animal economy has no headroom left, so beyond
+saturation a hand-turn spent on a second market is worth more than one
+spent making milk that sells for 1. Note the stable-plot design already
+works mechanically (crops survive, 1 weed vs v9's 9-14, wheat purchases
+cut from 12,960 to 3,915); only its economics were judged, and that
+judgement has flipped.
+
+The direction to pursue is a **multi-product economy** -- animals held
+at their non-glutting level, with the surplus labour moved onto
+additional markets (MELON base 250 and STRAWBERRY base 120 are the
+high-value crops; EGG has the gentlest glut curve in the game, log 0.20)
+rather than into more cows.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
