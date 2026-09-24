@@ -1732,6 +1732,78 @@ onto an animal-first agent, which is what all twelve attempts were.
 
 **v15 stands as the final agent.**
 
+## Crop attempt thirteen: role-persistent joint subsystem, also fails
+
+One more design, built specifically against the twelve documented
+failures: dedicated crop workers (not idle-time filler, since idle time
+was too fragmented to maintain a crop at all), but each one OWNS a
+fixed, spatially-contiguous block of tiles for the whole season and
+never re-targets across the plot -- so a worker's whole day is watering,
+not travelling. Hands were raised to cover both subsystems
+(`_hire_target` already adds `PLOT_WORKERS` on top of the herd's own
+target).
+
+**Four more real bugs were found and fixed, all invisible without
+instrumentation:**
+
+1. The crop subsystem's new seed-buy order was placed ahead of
+   `BUY_PRODUCT WHEAT` in `_market_orders`. With the 10-order cap
+   already absorbing sells, the seed order and up to several hires, the
+   wheat purchase was silently dropped -- the exact order-cap trap
+   already documented for hires and seeds separately, now recreated by
+   their interaction. Fixed by moving the wheat purchase to run
+   immediately after sells and seeds, ahead of hires/land/animals:
+   feeding an existing herd must always outrank hiring more of it or
+   seeding a second market.
+2. `_placement_duty_index` was computed over every unit's position,
+   including crop workers -- who ignore the `placement_duty` flag
+   entirely. Whenever a crop worker happened to be nearest the shed, the
+   duty assignment was silently wasted and no herd unit collected the
+   pending animal. Fixed by excluding crop-worker indices from the
+   candidate pool.
+3. The plot's tile ordering (by raw distance from the shed) chose the
+   right SET of tiles but not a spatially contiguous ORDER, so slicing
+   it into per-worker blocks produced blocks spanning opposite sides of
+   the ring. Fixed by re-sorting the selected tiles by angle around
+   their own centroid before slicing.
+4. A red herring, recorded so it is not re-investigated: a midday
+   snapshot showed 9-12 of 12-15 animals "unfed" and looked like a
+   feeding collapse. It was not one -- `_count_unfed_animals` reflects
+   whoever has not been fed YET today, and an end-of-day reading showed
+   0-3 unfed throughout, consistent with v15's own baseline rate.
+
+**None of the four fixes closed the gap.** Swept PLOT_WORKERS (2 and 4),
+PLOT_SIZE (12 and 24) and HIRE_COST_CEILING (34/55/89/144) in
+combination:
+
+| workers | hire ceiling | result |
+|---|---|---|
+| 4 | 144 | 0W/20L |
+| 4 | 34 / 55 / 89 | 0W/20L each (55 confirmed 0W/40L on a larger batch) |
+| 2 | 34 | 4W/36L (10%) |
+
+The mechanism, where it could be diagnosed: the daily hire bill under a
+raised ceiling (fib-summed, paid every morning) competes directly with
+animal purchases for the same early capital, and even at v15's own
+ceiling of 34, the extra 2-4 hands committed to crops for the whole
+season are hands the herd-building phase does not get to use during the
+exact days (roughly 0-15) when herd growth compounds hardest.
+
+**This closes the architecture, not just the tuning.** Thirteen attempts
+now span every allocation strategy available to a per-unit greedy
+loop -- dedicated, idle-time, and role-persistent-with-locality -- and
+every one loses to running animals alone. The leaders' approach (12
+hands, 4 quadrants, 25 animals and 60-80 crop tiles simultaneously,
+established from day 0) is not a bigger version of any of these designs;
+it requires committing capital and labour to both subsystems from the
+OPENING, before the herd has had time to compound, which is a different
+kind of decision than anything a greedy per-turn loop reallocating
+existing hands can express. Reaching it would mean redesigning the
+opening-game capital plan from scratch, not adding a crop layer to an
+established animal-first agent.
+
+**v15 stands as the final agent.**
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
