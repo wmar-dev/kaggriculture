@@ -18,3 +18,7 @@ training/models/
 
 # Agent folders (may hold credentials/tokens)
 .claude/
+
+# Downloaded Kaggle episode replays (large; regeneratable from the
+# EpisodeService API -- see research.md's replay-analysis section).
+replays/

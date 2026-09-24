@@ -1584,6 +1584,92 @@ additional markets (MELON base 250 and STRAWBERRY base 120 are the
 high-value crops; EGG has the gentlest glut curve in the game, log 0.20)
 rather than into more cows.
 
+## Replay analysis: the blueprint, and why our architecture cannot reach it
+
+Two top-agent replays were obtained manually (the in-API
+`GetEpisodeReplay` returns 404; the browser URL
+`https://www.kaggle.com/competitions/episodes/<id>/replay.json` works).
+They are the most informative artefact in the project.
+
+### What the leaders actually do
+
+**Episode 90494316, 183,993 points** -- revenue 238,097:
+
+| product | units | revenue | avg price |
+|---|---|---|---|
+| STRAWBERRY | 313 | 64,251 | 205 |
+| MILK | 237 | 57,114 | 241 |
+| WOOL | 164 | 39,234 | 239 |
+| WHEAT | 828 | 35,681 | 43 |
+| MELON | 144 | 29,634 | 206 |
+| FERTILIZER | 233 | 12,183 | 52 |
+
+Its herd is **14 animals (8 COW, 6 SHEEP) -- the same size as ours**, on
+3 quadrants. The entire difference is **61 crop tiles** held from day 15
+(42 STRAWBERRY, 12 MELON, 7 WHEAT), planted from day 0.
+
+**Episode 112999172, 96,485 points** -- sells **all nine products**, runs
+**12 hands**, peaks at **25 animals** and **80 simultaneous plants** on
+**4 quadrants**, with a deliberately SMALL milk line (131 units, 9,993).
+Its animal mix includes 7-8 GOOSE.
+
+Per-product revenue there is modest and even (9k-32k across nine
+products). That is the actual strategy: spread across every demand
+curve rather than saturate any one of them. Our three-product economy
+saturates two of them and stalls at ~50k.
+
+### Engine facts the replays exposed
+
+- **`BUY_SEED` takes a QUANTITY.** Their orders are
+  `["BUY_SEED", "WHEAT", 7]`, and the engine's per-unit market loop
+  commits all seven. v2-v15 always passed 1, spending an order slot per
+  seed. Seed units bought matched tiles planted exactly (92/24/42).
+- **Ongoing crops need watering only every OTHER day.** For
+  `ongoing` crops (STRAWBERRY, TOMATO) production happens on its
+  interval whether or not the tile was watered; watering only prevents
+  death (two consecutive dry days) and gates the fertiliser bonus. Their
+  922 WATER actions across 61 tiles is 30/day -- exactly half. One-time
+  crops (WHEAT, CARROT, MELON) are different: the WATER action itself is
+  what adds yield inside the bonus window.
+
+### Eight failed attempts to reach it
+
+Every attempt to add a second market to v15 lost, and the failure mode
+was always the same -- the new subsystem starves the old one:
+
+| attempt | result |
+|---|---|
+| melon plot, 4 / 6 / 8 tiles | 35% / 55% / 75% (20 seasons) |
+| melon plot, 8 tiles | **45% over 100 seasons** -- the 75% was noise |
+| strawberry, 8 tiles | lost |
+| strawberry, 12 / 16 / 20 tiles | 0% / 0% / 0% |
+| strawberry + alternate-day watering, 16 / 24 / 32 | 0% / 5% / 0% |
+| + board-wide plot, more workers, higher hire ceiling | 0% / 0% / 0% |
+| GOOSE added to the herd mix | lost (geese flooded the herd) |
+| GOOSE + return-on-capital valuation | 35% |
+
+Three implementation bugs were found and fixed along the way, none of
+which changed the verdict: the plot was selected by
+furthest-from-shed, which picks the four CORNERS of the board (a
+maximally scattered plot); the uncapped hire loop drained the bank every
+morning (final balance 38); and buying a full seed batch on day 0 spent
+1,200 of the starting 3,000 before a single animal was placed.
+
+### The actual obstacle
+
+Every configuration that adds a second subsystem takes hands and capital
+from the herd, and the herd collapses -- animals starve, escape, and the
+economy unwinds. The leaders avoid this by running a *larger* farm in
+every dimension at once (12 hands, 4 quadrants, 25 animals, 60-80 crop
+tiles), which is the same "only works together" pattern v15 established,
+but at a scale our per-unit greedy loop with a single shared `claimed`
+set has not been made to reach.
+
+This is a design limit, not a tuning one. A serious attempt needs
+explicit per-unit role assignment and a capital plan that funds both
+subsystems from the opening, rather than knobs layered onto an
+animal-first agent.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
