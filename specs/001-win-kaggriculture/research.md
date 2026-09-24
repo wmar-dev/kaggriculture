@@ -931,6 +931,38 @@ became unreferenced and were removed. `choose_best_crop`,
 at **58-66k** (v11 managed 48-55k), and **93% vs v11** (13W-1L, 33,803
 against 28,725).
 
+## v13: liquidate unit inventories before the season ends
+
+With crop farming gone, v12's herd rose from ~7 to **12** -- the farmer
+joining the animal loop added the labour that the feeding-throughput
+ceiling had been short of, confirming that diagnosis. Re-tuning the herd
+knobs against v12 (`REINVEST_RESERVE` 1.5/2/2.5 x `MAX_STRUCTURES`
+15/25) found nothing better: the control scored mostly ties, every
+variant scored below it. The existing values survive a changed baseline.
+
+The animal loop itself is near-perfect: across 263 animal-days, animals
+were **fed 95%** of days and **cared for 100%**. No slack there either.
+
+**The waste was at the buzzer.** Anything still in a unit's inventory
+when the season ends is worth nothing -- only banked money scores -- and
+the end-of-day drop into the shed on the final day lands *after* the
+last chance to sell. Measured at season end: units still carrying
+**10 MILK, 12 FERTILIZER and 12 WHEAT, roughly 3,356** at prevailing
+prices, about **7.5% of that game's final money**, simply evaporating.
+
+**The first fix was much worse than the bug.** Triggering liquidation
+for any sellable good across the whole final day collapsed a measured
+game from ~44,500 to **5,972**: WHEAT counts as a sellable good, so
+units spent the entire day thrashing -- pick wheat up to feed an animal,
+immediately "liquidate" it into the shed, pick it up again. Excluding
+feed from the trigger and confining it to the final hours (from hour 18)
+keeps the feed/care/harvest loop running right up until there is no
+longer time to sell what it produces.
+
+**Results** (bundled, 14 seasons/opponent): 100% vs random/starter/greedy
+at **61-70k** (v12 managed 58-66k), and **79% vs v12** (11W-3L). Two dev
+batches measured 80% and 95%.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
