@@ -1067,6 +1067,99 @@ pits the candidate against **itself**. Two runs were wasted on this (they
 showed 15-18 ties out of 24-30, which is the tell). Head-to-head runs
 should name the baseline explicitly: `--opponents submissions/v13/main.py`.
 
+## Bench noise: 20-season batches can manufacture a 65% result
+
+The most important result of this round is about the measuring
+instrument, not the agent.
+
+A hiring change measured **13W/7L (65%)** over 20 seasons. Re-run over 40
+more seasons it scored **57%**, and over 60 more it scored **47%**.
+Pooled across all 120 seasons: **64W/56L, 53%** -- indistinguishable from
+a coin. The 65% was noise, and it was noise that survived a plausible
+mechanism, a tuning sweep with a clean-looking peak (6 hires 5%, 7 hires
+65%, 8 hires 50%, 9 hires 25%, 10 hires 5%), and a confound check.
+
+**Guidance: 20 seasons is only enough to detect large effects.** A true
+55-60% edge needs roughly 100+ seasons to separate from 50%. Use 20-season
+batches to *screen out* clear losers, never to adopt a marginal winner.
+
+This cuts the other way too, and is why v13 was not re-litigated on
+suspicion alone: real effects in this game have been huge and show up at
+any sample size. Re-verified at 60 seasons, **v13 beats v12 56W/4L (93%)**,
+which settles the question its original 14-season, 11W-3L adoption left
+open. v12 itself scored 537.8 on the real leaderboard.
+
+## Post-v13, round 2: the hiring system, and two more negative results
+
+### What the engine actually does with hands
+
+Three mechanics that v2-v13 were all written against incorrectly:
+
+- **Hands are DAILY.** `farm["hands"] = []` runs every night, so the
+  entire crew is re-hired each morning and the farm starts every day at
+  zero hands. v13's hand count at hour 0 is always 0.
+- **Hands are nearly free.** `FARM_HAND_COST_MULT = 1`, so the n-th hire
+  of a day costs fib(n) = 1, 1, 2, 3, 5, 8, 13, 21... dollars. The first
+  seven hands of a day cost 33 in total.
+- **The hire queue was being silently truncated.** v13 queues the whole
+  day's hires in the hour-0 turn, but a turn accepts only
+  `maxMarketOrdersPerTurn` (10) orders. With a hire target of 14 for most
+  of the season, v13 actually ran **7-8 hands**.
+
+### 5. Spreading hires past the order cap (53% over 120 seasons)
+
+Emitting hires across the first few turns of the day, with a cost ceiling
+on the fib schedule, reliably hit the intended hand count. It is the
+result above: not an improvement. More hands than ~7 is actively harmful
+(ceiling 400, reaching 14 hands, scored **0W/20L**), so v13's accidental
+truncation was landing near the optimum anyway.
+
+### 6. Order priority: sell orders must keep their slots (15% vs 65%)
+
+Worth recording separately because the effect was large and is a trap for
+any future change that adds orders. Emitting HIRE orders **before** the
+sell orders -- same hand count, same everything else -- scored **15%**
+where emitting them last scored **65%**. Filling the 10-order cap during
+hours 0-3 blocks `BUY_PRODUCT WHEAT`, so animals go unfed and escape.
+(It is not a shed-capacity problem: the shed peaks at 45 of 100.)
+
+**Anything added to `_market_orders` goes after the sells.**
+
+### Also ruled out this round
+
+- **Feeding is not optional.** `yield_units` accrues whether or not an
+  animal was fed -- feeding only prevents escape (2 consecutive missed
+  days) and gates the care bonus. But the bonus is where the value is: a
+  cared-and-fed COW yields 3 per production day against a bare 1, and on
+  a production day the accumulated bonus is discarded unless the animal
+  was fed that day. Skipping a feed day saves ~40 of wheat and costs a
+  bonus unit worth ~226.
+- **No yield is lost to the `max_held` cap.** Every animal ends every day
+  at 0 held units; harvesting keeps up completely.
+- **The shed never fills** (mean 7.6, max 45, capacity 100).
+
+### Where the money actually goes
+
+Full accounting of one season (revenue 75,394, final 52,642):
+
+| flow | amount |
+|---|---|
+| MILK revenue | 55,338 |
+| FERTILIZER revenue | 13,325 |
+| WOOL revenue | 6,685 |
+| **WHEAT purchases** | **-12,960** |
+| animals (11 COW, 3 SHEEP) | -5,900 |
+| land + hires | ~-6,900 |
+
+**Wheat is half of all outflow**, bought at a price that climbs 25 -> 57
+across the season because both farms and five of the eight shop types
+drain the same wheat market. Growing feed instead of buying it remains
+the single largest untapped lever, and is exactly what v9 attempted and
+failed at -- for coordination reasons (greedy per-unit re-targeting),
+not economic ones. The identified-but-untried design is still assigning
+each unit a stable plot rather than re-deciding the nearest needy tile
+every turn.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

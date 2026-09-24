@@ -5,6 +5,10 @@ PY      := $(VENV)/bin/python
 PIP     := $(VENV)/bin/pip
 KAGGLE  := $(VENV)/bin/kaggle
 
+# 20 seasons screens out clear losers, but is NOT enough to adopt a
+# marginal winner: a hiring change measured 65% over 20 seasons and 53%
+# over 120 (see research.md, "Bench noise"). Use SEASONS=100+ before
+# adopting anything that measures under ~70%.
 SEASONS ?= 20
 
 # Kaggle allows 5 submissions per day for this competition (spec FR-004
