@@ -130,3 +130,90 @@ def test_units_are_not_blocked_from_the_shed_by_another_units_claim():
     claimed = set(shed_tiles(10))
     action = _decide_hand_action(obs, (0, 0), {}, claimed)
     assert action != ["PASS"], "unit idled instead of heading for the shed"
+
+
+def test_placement_duty_never_selects_an_excluded_index():
+    """v16 regression: _placement_duty_index must never return an index
+    in `exclude`.
+
+    Crop workers ignore the placement_duty flag entirely, so if the
+    nearest-to-shed unit happens to be a crop worker, picking it silently
+    wastes the assignment -- no herd unit ever collects the pending
+    animal. This was a real bug in an earlier attempt at a joint
+    crop+animal subsystem.
+    """
+    from kaggriculture_agent.observation import parse_observation
+    from kaggriculture_agent.strategy import _placement_duty_index
+
+    board = [[None for _ in range(10)] for _ in range(10)]
+    obs = parse_observation(
+        {
+            "player": 0,
+            "step": 0,
+            "day": 5,
+            "hour": 3,
+            "farms": [
+                {
+                    "money": 1000,
+                    "tiles": board,
+                    # Hand 0 (index 1) sits ON the shed -- the nearest
+                    # possible unit -- but is excluded as a crop worker.
+                    "farmer": [9, 9],
+                    "hands": [[4, 4], [8, 8]],
+                    "unlocked_quadrants": ["NW"],
+                    "hires_today": 0,
+                },
+                {"money": 1000, "tiles": board, "farmer": [0, 0], "hands": []},
+            ],
+            "market": {"inventory": {}, "prices": {}},
+            "town": {"unlocked_shops": []},
+            "private": {
+                "shed": {"COW": 1},  # a pending animal is waiting
+                "seeds": {},
+                "inventories": [{}, {}, {}],
+            },
+        }
+    )
+    duty = _placement_duty_index(obs, exclude={1})
+    assert duty != 1, "excluded index was selected for placement duty"
+
+
+def test_plot_tiles_never_includes_land_beyond_max_quadrants():
+    """v16 regression: an earlier version of plot_tiles anchored on the
+    tile FURTHEST from the shed, which selects the SE quadrant -- land
+    MAX_QUADRANTS=3 never actually unlocks. The entire plot sat on
+    permanently locked ground and zero crops were ever planted.
+    """
+    from kaggriculture_agent.strategy import MAX_QUADRANTS, QUADRANTS, plot_tiles
+
+    board_size = 10
+    half = board_size // 2
+    ownable = set(QUADRANTS[:MAX_QUADRANTS])
+
+    def quadrant(x, y):
+        return ("N" if y < half else "S") + ("W" if x < half else "E")
+
+    for tile in plot_tiles(board_size):
+        assert quadrant(*tile) in ownable, f"{tile} is in a quadrant we never buy"
+
+
+def test_plot_tiles_are_spatially_contiguous():
+    """v16 regression: sorting candidate tiles by shed-distance alone
+    picks the right SET of tiles but not a spatially contiguous ORDER,
+    so slicing the result into per-worker blocks (worker_block) produced
+    blocks spanning opposite sides of the ring. Each worker's block
+    should be a short walk from itself, not the whole board.
+    """
+    from kaggriculture_agent.strategy import plot_tiles, worker_block
+
+    plot = plot_tiles(10)
+    assert len(plot) >= 4, "test needs a non-trivial plot to be meaningful"
+    # A 3-way split of a well-ordered ring should keep each worker's
+    # tiles within a small neighbourhood, not scattered across the board
+    # (a scattered block's internal span approaches the board's diameter).
+    for worker in range(3):
+        block = worker_block(plot, worker, 3)
+        if len(block) < 2:
+            continue
+        span = max(abs(a[0] - b[0]) + abs(a[1] - b[1]) for a in block for b in block)
+        assert span <= 8, f"worker {worker}'s block is scattered (internal span {span}): {block}"

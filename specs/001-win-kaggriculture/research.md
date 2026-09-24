@@ -1804,6 +1804,94 @@ established animal-first agent.
 
 **v15 stands as the final agent.**
 
+## v16: attempt fourteen breaks the streak -- grow WHEAT, not a second market
+
+Thirteen straight failures shared a hidden premise: that the second crop
+should be a second MARKET (MELON, STRAWBERRY), competing for revenue
+against a demand curve we have to beat. WHEAT is not that. It is not
+competing for revenue at all -- it directly offsets an
+ALREADY-MEASURED expense: v15 buys ~330 units/season for ~12,960 (about
+half of all outflow) at a price that climbs 25 -> 57 because both farms
+and five of the eight shop types drain the same market.
+
+WHEAT is also a different LABOUR problem. Seed 10, first_yield_day 2,
+max_yield_day 4: a planting ties up a worker for ~5 days total (1 plant
++ up to 4 waters), against MELON's ~13-day one-time cycle or
+STRAWBERRY's indefinite ongoing hold. A worker finishes a WHEAT cycle
+and is free again in under a week, so the capital and labour it commits
+during the herd's day-0-15 compounding phase is much smaller than any
+prior attempt.
+
+### Design
+
+Reused the role-persistent locality design from attempt thirteen
+(dedicated workers, each owning a fixed contiguous block of tiles for
+the season), but rebuilt with all four of that attempt's bugs fixed from
+the start:
+
+- the crop seed order and the `BUY_PRODUCT WHEAT` feed purchase are both
+  placed ahead of the hire queue in `_market_orders`, so neither loses
+  its slot to the 10-order cap;
+- `_placement_duty_index` takes an `exclude` set and is called with the
+  crop-worker indices excluded, so the assignment can never be wasted on
+  a unit that ignores it;
+- the plot's tile selection is re-sorted by angle around its own
+  centroid before slicing into per-worker blocks, so each worker's block
+  is spatially contiguous rather than scattered.
+
+`_hire_target` already had a `PLOT_WORKERS` term from the prior attempt,
+so hands are hired to cover both subsystems automatically.
+
+### Results
+
+A worker-count sweep at 40 seasons showed a real, non-monotonic-noise
+shape (1 -> 75%, 2 -> 75%, 3 -> 92%, 4 -> 28% -- a genuine optimum, not a
+single lucky point, of the kind `REINVEST_RESERVE` showed and the
+20-season false positives earlier this session did not). 3 workers /
+12 tiles was confirmed at 100 seasons: 79W/21L (79%).
+
+A hire-ceiling sweep under the 3-worker config found `HIRE_COST_CEILING
+= 55` (v15's own value was 34) beats 34 head-to-head, 27W/13L (68%, 40
+seasons) -- more hands pays off here because the herd genuinely has
+somewhere to put them, unlike the same knob under v15 alone.
+
+**Final config (3 workers, 12 tiles, hire ceiling 55), confirmed
+against v15 across three independent batches on the exact bundled
+`submissions/v16/main.py`:**
+
+| batch | result |
+|---|---|
+| 40 seasons | 37W/3L (92%) |
+| 100 seasons | 82W/18L (82%) |
+| 100 seasons (final bundle, re-verified) | 91W/9L (91%) |
+| **pooled, 240 seasons** | **210W/30L, 87.5%** |
+
+The strongest and most consistent local signal of the project, by a
+wide margin over v14 (55.6% over 340 seasons) and v15 (57.2% over 320)
+against their own predecessors. Money margin held positive in every
+batch, final pooled +16.3%. 100% vs random/starter/greedy at 72-78k
+(v15: 62-74k) -- the highest reference-bench money of any version.
+
+Mechanism, traced directly: herd reaches 15 (fully intact, not
+starved), hands plateau at 9-10 (matching v15's own trajectory), and
+WHEAT purchase spend drops from ~12,960 to ~7,458 while 100+ units of
+home-grown wheat sell for several thousand more on top -- a swing worth
+roughly 10,000 a season on this one line alone, achieved without taking
+anything away from the herd.
+
+The bundle was verified behaviourally identical to the tested working
+tree (0 differing actions across 299 compared turns) before every
+confirmation batch that decided the final configuration.
+
+**Data-hygiene note.** An early hire-ceiling-34 batch was logged under
+the "v16" label before the final ceiling=55 config was chosen, so
+`select_final`'s pooling (which assumes a version's bundle is frozen)
+mixes it with the ceiling=55 evidence when reporting the "v16" win rate
+via `make select`. The 87.5% figure cited above is NOT from that pooled
+number -- it is computed only from the three batches run specifically
+against the final, bundle-verified `submissions/v16/main.py` (ceiling
+55), listed in the table.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
