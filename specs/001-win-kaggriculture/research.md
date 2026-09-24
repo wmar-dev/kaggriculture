@@ -1670,6 +1670,68 @@ explicit per-unit role assignment and a capital plan that funds both
 subsystems from the opening, rather than knobs layered onto an
 animal-first agent.
 
+## Crops, attempt four: the idle-time design, and why it also fails
+
+The eight earlier failures all shared a mechanism -- any design that
+RESERVES workers for crops takes them off the herd, the animals starve,
+and the economy unwinds. So the allocation was inverted: the herd gets
+first call on every unit every turn, exactly as in v15, and a unit only
+touches the plot when its herd decision would otherwise have been idle.
+By construction this cannot starve the animals, and the measurement
+confirms it -- **the herd stayed at 15 in every configuration**.
+
+It still loses (20% at v15's hiring, 15%/5%/15% with hire ceilings
+55/89/144).
+
+### Four real bugs found building it
+
+Each one produced zero crops and would have been invisible without
+direct instrumentation:
+
+1. **The plot was on land we never buy.** Anchoring on the tile furthest
+   from the shed selects the SE quadrant, which `MAX_QUADRANTS = 3`
+   never unlocks. The entire plot sat on permanently locked ground.
+2. **The seed order was silently dropped.** Placed after the sells and
+   the hire queue, it fell outside `maxMarketOrdersPerTurn` -- the same
+   order-cap trap already documented for hires. Seeds were bought only
+   after moving it ahead of the hires.
+3. **Idle units could not reach the plot.** `_decide_hand_action`
+   returns PASS only for a unit standing ON the shed; every other idle
+   unit gets the walk-to-shed fallback. A unit sent toward the plot was
+   dragged back the next turn. Fixed by giving the herd loop an explicit
+   "nothing for you" hook at both idle points, and by only walking to
+   the shed when there is actually an errand there.
+4. **A far plot is unreachable on intermittent labour.** Even with the
+   hook, idle units set off toward a corner plot **207 times and arrived
+   4 times**: it is 6-8 tiles away, so it needs that many CONSECUTIVE
+   idle turns, and idleness comes in gaps of one or two.
+
+### Why it fails even when it works
+
+With the plot moved just outside the reserved ring, crops finally grow --
+and barely: 9 plants, 4 waters, 6 weeds cleared in a season. **Idle time
+is the wrong shape for farming.** It arrives in one- and two-turn gaps,
+while a one-time crop needs watering every single day (a two-day lapse
+turns it into a weed) and an ongoing crop every other day. Fragmented
+labour cannot maintain a crop at all; it can only plant one and watch it
+die.
+
+That closes the loop on all twelve attempts:
+
+- **dedicated** labour maintains crops but starves the herd,
+- **idle** labour cannot starve the herd but cannot maintain crops,
+- **more hands** to have both costs more in fib hire fees, charged
+  daily, than the crops return (15% / 5% / 15%),
+- and the plot competes with pasture land wherever it is put.
+
+The leaders escape this because they run 12 hands, 4 quadrants and 25
+animals *simultaneously*, with crops planted from day 0 as a co-equal
+subsystem rather than an addition. Reaching that needs a capital and
+labour plan designed jointly from the opening -- not a crop layer bolted
+onto an animal-first agent, which is what all twelve attempts were.
+
+**v15 stands as the final agent.**
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
