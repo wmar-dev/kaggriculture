@@ -1433,6 +1433,81 @@ higher one. `MAX_STRUCTURES` (15) is not binding, land is not binding
 and milk is not glutted (market inventory stays below I0 all season).
 What binds at 11 is not yet identified.
 
+## v15 tips the market into glut -- and composition cannot react
+
+Raising the herd changed which constraint binds. v15 reaches
+MAX_STRUCTURES (15) by day 14 with **zero escapes**, and at that scale
+production crosses the town's absorption capacity:
+
+| | v13 | v15 |
+|---|---|---|
+| MILK end inventory | -35 (scarce) | **+76 (glut)** |
+| MILK end price | 226 | **1** |
+| MILK average sale price | 225 | 147 |
+| WOOL end price | (glutted in some draws) | 223 (scarce) |
+
+This also explains why raising `MAX_STRUCTURES` now loses (18 -> 5%,
+22 -> 5%, 26 -> 15%): the herd already out-produces the market, so extra
+animals make near-worthless milk. 15 is a genuine economic optimum, not
+an arbitrary cap. `HIRE_COST_CEILING = 34` likewise re-validated under
+the new regime (21 -> 25%, 55 -> 30%, 89 -> 20%).
+
+**Composition cannot self-correct, structurally.** The existing price
+heuristic sits at 9 COW / 6 SHEEP straight through the collapse (milk
+203 -> 42 -> 38, herd unchanged), because the herd fills by day 14, the
+glut appears around day 18, and **animals cannot be sold** -- they are
+not market products. By the time the signal exists the decision is
+already unchangeable, so any composition rule has to be predictive.
+
+Two attempts, both rejected:
+
+- **Modelling town demand from the shop draw** went the WRONG way (12
+  cows, worse than v15's 9), because `expected_demand_rate` counts all
+  8 shop instances from day 0 when shops actually unlock one per three
+  days -- it badly overestimates early milk demand.
+- **A hard cow cap**: 4 -> 25%, 6 -> 60%, 8 -> 20% over 20 seasons.
+  The apparent peak at 6 did not survive: **36W/57L/7T (36%) over 100
+  seasons**, pooled 40% over 120.
+
+Note this is not "wool good, milk bad". WOOL's glut curve (sq 3.20) is
+HARSHER than MILK's (linear 1.6); wool only looks healthy because we own
+6 sheep rather than 15. Both products crash at scale, and the real
+problem is that one farm at MAX_STRUCTURES saturates this town.
+
+## Local self-play substantially overstates leaderboard improvement
+
+The single most important result to record. Converged public scores:
+
+| version | converged |
+|---|---|
+| v10 | 454.7 |
+| v11 | 440.1 |
+| v12 | 452.2 |
+| v13 | 459.1 |
+
+v13 beat v12 **56W/4L (93%)** over 60 local seasons. On the leaderboard
+they are **459.1 vs 452.2** -- a 7-point gap, inside the noise that moved
+v12's own score by 17 points between readings. Every version from v10 to
+v13 sits in a 440-460 band despite large, statistically solid local
+margins between them.
+
+The mechanism is the documented blind spot, now quantified: self-play
+measures how well an agent beats *its own previous version*, which is a
+different question from how it scores against a field of other people's
+agents. A change that exploits a weakness we share with ourselves reads
+as 93% locally and roughly zero in reality.
+
+**Implication for method.** Local head-to-head results remain valid as
+measurements -- v14 (55.6% over 340 seasons) and v15 (57.2% over 320)
+are real -- but they should be read as "does not regress" evidence
+rather than as predicted leaderboard gains. Expect single-digit point
+movement, not a step change. Closing a 6x gap to leaders at ~3,000 is
+very unlikely to come from further self-play-guided tuning.
+
+**And a third strike for 20-season batches**, which today produced
+65% (true 53%), 60% (true 36%) and 45% for a change that was really
+57%. They screen out losers. They decide nothing.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
