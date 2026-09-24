@@ -1160,6 +1160,94 @@ not economic ones. The identified-but-untried design is still assigning
 each unit a stable plot rather than re-deciding the nearest needy tile
 every turn.
 
+## v9's crop-farming problem is solved, and farming still loses
+
+This is the fourth attempt at growing the herd's feed, and the first in
+which the farming itself demonstrably worked. It still lost, for a
+reason none of the previous three identified.
+
+### The stable plot fixes the coordination failure
+
+research.md has recorded since v12 that crops failed on COORDINATION, not
+economics: every unit re-decided for the nearest needy tile each turn, so
+crops were planted and abandoned unwatered, leaving 9-14 weed tiles and
+~939 of revenue against ~1,400 of seed. The identified-but-untried fix
+was a stable plot. Implemented as: a fixed, compact set of tiles worked
+only by dedicated units that never look at anything else, fenced off from
+pasture building, with seeds bought to a small buffer.
+
+It works. Measured in one season against v13:
+
+| | v13 | stable plot |
+|---|---|---|
+| wheat bought | ~330 units, 12,960 | 102 units, 3,915 |
+| weed tiles left | n/a | **1** (v9 left 9-14) |
+| plot actions | -- | 71 PLANT, 303 WATER, 187 HARVEST |
+| animals unfed (midday mean) | 5.1 | **3.6** |
+
+So the crop survives, the plot pays for itself in feed, and feeding
+actually improves. **And it loses 3W/17L.**
+
+### Why: shed-adjacent land is the farm's scarcest resource
+
+The first versions put the plot on the eight tiles CLOSEST to the shed,
+reasoning that compactness and a short delivery run were what mattered.
+Isolating that choice produced the sharpest result of the session:
+
+**Fencing the eight near-shed tiles, with no plot worker ever activated,
+measured 0W/20L on its own.**
+
+Every animal is fed from the shed every single day, so pasture proximity
+is paid 30 times over per animal; a crop needs the shed once per harvest.
+v13 places its herd at a mean distance of **1.00** from the shed, and
+that is not incidental -- it is load-bearing. Moving the plot to the far
+corner of the starting quadrant and giving the herd back the near ring
+lifted the same agent from 15% to **25%**.
+
+### Why it still loses: labour opportunity cost
+
+With the land error corrected, what remains is simply that a hand is
+worth more on the herd. Diverting two hands drops the herd from 12 to
+7-8, and four cows are worth roughly 18,000 in milk against the ~9,000
+of wheat the plot saves.
+
+Everything tried against that failed:
+
+| variant | result |
+|---|---|
+| near plot, 1 / 2 / 3 workers | 15% / 30% / 15% |
+| near plot + spread hiring (9/10/11 hands) | 20% / 15% / 5% |
+| near plot + prompt wheat delivery | 15% |
+| deferred start, day 10 / 15 / 20 | 10% / 5% / **0%** |
+| **far plot** + spread hiring | **25%** |
+| far plot, v13 hiring, 1 / 2 workers | 15% / 20% |
+
+Deferring the start made it monotonically *worse*, which is consistent:
+the later the plot starts, the larger the herd whose labour it steals.
+
+Two implementation bugs found and fixed en route, both of which suppress
+the benefit rather than cause the loss: plot workers hoarded harvested
+wheat (12 units stranded at midday with 3 animals unfed) because they
+only delivered when the plot had no work at all -- and `_market_orders`
+counts wheat in ANY unit's inventory as available, so that also
+suppressed buying; and the extra hands meant to staff the plot never
+materialised, because the hire queue is truncated by the per-turn order
+cap (see the previous section).
+
+### Verdict
+
+Feed self-sufficiency is now closed for a fourth time, but on new
+grounds: not "the crops die" (they don't any more) and not "it doesn't
+pay for itself" (it does), but that hand-turns are worth more on animals
+than on wheat, at every plot size, staffing level and start day tried.
+
+The reusable finding is the land one. **Tiles near the shed are the
+scarcest thing the farm owns**, and anything that consumes them should be
+assumed harmful until measured. (Weeds are not a meaningful consumer of
+them: they spawn on empty tiles at 0.5%/day and only ~0.8 per season land
+within distance 2, on a herd that is brake-limited rather than
+land-limited. Not worth a DIG.)
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
