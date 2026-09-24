@@ -1248,6 +1248,46 @@ them: they spawn on empty tiles at 0.5%/day and only ~0.8 per season land
 within distance 2, on a herd that is brake-limited rather than
 land-limited. Not worth a DIG.)
 
+## The herd cap is not any of the things it looks like
+
+v13's herd sits at 12-13 and every attempt to raise it loses. This round
+tried to establish *what* the binding constraint actually is, by ruling
+out each candidate directly rather than by tuning against it.
+
+**It is not the market.** MILK inventory stays BELOW I0 for the entire
+season (measured -17, -34, -57, -66, -35 at five-day intervals), so milk
+is scarce, not glutted, even in self-play with two full herds selling
+into it. The price ends at 226 against a base of 160. More milk would
+sell at a good price; we simply do not produce it.
+
+**It is not wheat supply.** Of 568 turns in which at least one animal was
+hungry, **567 had wheat available** -- a mean of 7.0 in the shed plus 1.8
+carried on units. Exactly one turn in a season was supply-limited.
+Feeding is a logistics problem, never a stock problem.
+
+**It is not the number of hands.** Adding hands does not improve feeding
+at all: 9.4 hands produced a midday mean of 5.3 unfed animals against
+v13's 5.1 unfed on 6.8 hands. Hands are not the throughput limit.
+
+**And it is not the three constraints interacting**, which was the most
+promising remaining theory. The cap is circular -- the pending-animal
+brake freezes the herd, a frozen herd leaves extra hands idle, idle hands
+measure harmful, and with only 7 hands unsticking the brake starves the
+herd (0W/20L). Each fix had only ever been tested alone. Growing all
+three together (placement duty + spread hiring at ceilings 34 / 89 / 233)
+scored **0W/20L, 0W/20L, 0W/20L**, worse the more hands were added, and
+the herd did not even grow (9.0 against v13's 8.8).
+
+So the herd cap survives every explanation offered for it so far. What is
+established is narrow but firm: feeding is logistical, more hands do not
+help it, and the system does not respond to being grown.
+
+**Config verified.** All eleven configuration values the agent assumes
+match the bundled environment's own defaults exactly (episodeSteps 720,
+maxMarketOrdersPerTurn 10, shedCapacity 100, farmHandCostMult 1,
+turnsPerDay 24, and the rest), so none of this is an artefact of tuning
+against the wrong game.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
