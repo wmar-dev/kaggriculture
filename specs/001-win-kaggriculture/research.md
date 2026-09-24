@@ -1362,6 +1362,77 @@ were* the reference bench (0.54) and ranked v14 **below** v13 on
 evidence that actually favoured it. Now pooled, with the game counts
 summed per opponent, which also makes sample sizes honest.
 
+## v15: three fixes that only work together
+
+The herd cap, unexplained for two sessions, turned out to be three
+constraints propping each other up. Each had been tested alone and each
+had measured as a loss, which is exactly why it stayed hidden.
+
+1. **The pending-animal brake.** A bought animal only leaves the shed if
+   a unit happens to stand on a shed tile while NO animal is unfed. Past
+   a certain herd size someone is always unfed at dawn, so an animal sat
+   unplaced for **78% of v13's turns**, and since `_market_orders`
+   refuses to buy while one is pending, the herd froze at 12-13 while
+   the bank climbed past 46,000.
+2. **The serialised shed** (fixed in v14): `claimed` was applied to the
+   shed, so one unit per turn could travel there and everyone else
+   idled -- 22.5% of all unit-turns.
+3. **The truncated hire queue**: the whole day's hires were emitted in
+   the hour-0 turn and cut off by `maxMarketOrdersPerTurn`, so v13 ran
+   7-8 hands however high the target was.
+
+Unsticking (1) alone measured **0W/20L, three separate times**, because
+the bigger herd could not be fed -- (2) and (3) were both throttling the
+feed loop. Fixing (3) alone measured harmful, because with the herd
+frozen by (1) and the shed serialised by (2), extra hands had nowhere to
+go. Fixing (2) alone is v14: real, but modest, because the herd stayed
+frozen.
+
+**Together** (v15): herd **8.8 -> 11.0**, pending animals **0.80 ->
+0.23**, idle unit-turns **34.2% -> 15.8%**.
+
+This is the explanation for a long run of confusing measurements: why
+"more hands never improved feeding" (9.4 hands gave 5.3 midday unfed
+against 6.8 hands giving 5.1), why feeding was always logistics-limited
+and never supply-limited (567 of 568 hungry-animal turns had wheat
+available), and why every single-knob herd-growth experiment failed.
+
+**Results.** 100% vs random/starter/greedy at 69-72k (v14: 62-74k).
+Head to head against v14:
+
+| batch | result |
+|---|---|
+| 20 seasons | 11W/9L (55%) |
+| 100 seasons | 61W/39L (61%) |
+| 100 seasons | 54W/46L (54%) |
+| **pooled, 220 seasons** | **126W/94L (57.3%)** |
+
+One-sided p ~= 0.015, with the money margin favouring v15 in all three
+batches (+4.1%, +3.7%, +4.3%) -- the same effect size v14 showed over
+v13, stacking on top of it.
+
+### Method note
+
+Because these knobs were re-tested as toggles layered onto v14, the
+scaffolding itself was verified behaviour-neutral first: with every
+toggle at its v14 default, the rebuilt agent produced **identical
+actions on all 400 turns** compared. Worth doing -- an early version of
+the scaffolding was NOT neutral (it added an affordability check to the
+hire queue that the engine's own `_do_hire` already performs, which made
+it queue fewer hires in the cash-poor early game).
+
+Note also that identical agents do NOT tie in this harness: they diverge
+through the shared market and the seat asymmetry, so "few ties" is not
+evidence of a behavioural difference. The turn-by-turn action diff is.
+
+### Still open
+
+The herd now reaches ~11 rather than ~13+, so a cap remains -- just a
+higher one. `MAX_STRUCTURES` (15) is not binding, land is not binding
+(9 near-shed tiles sit empty from day 12), wheat supply is not binding,
+and milk is not glutted (market inventory stays below I0 all season).
+What binds at 11 is not yet identified.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
