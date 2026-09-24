@@ -44,22 +44,77 @@ def _is_submittable(version: str) -> bool:
     return (SUBMISSIONS_DIR / version / "main.py").exists()
 
 
+def _merge_results(results: list[dict]) -> list[dict]:
+    """Pool per-opponent results, summing the underlying game counts."""
+    by_opponent: dict[str, dict] = {}
+    for r in results:
+        acc = by_opponent.setdefault(
+            r["opponent"],
+            {"opponent": r["opponent"], "seasons": 0, "wins": 0, "losses": 0, "ties": 0,
+             "_money": 0.0, "_opp_money": 0.0},
+        )
+        # Older records predate the `seasons` field; the game counts are
+        # the source of truth either way.
+        seasons = r.get("seasons") or (r.get("wins", 0) + r.get("losses", 0) + r.get("ties", 0))
+        acc["seasons"] += seasons
+        acc["wins"] += r.get("wins", 0)
+        acc["losses"] += r.get("losses", 0)
+        acc["ties"] += r.get("ties", 0)
+        acc["_money"] += r.get("mean_money", 0.0) * seasons
+        acc["_opp_money"] += r.get("opponent_mean_money", 0.0) * seasons
+    merged = []
+    for acc in by_opponent.values():
+        seasons = acc["seasons"] or 1
+        merged.append({
+            "opponent": acc["opponent"],
+            "seasons": acc["seasons"],
+            "wins": acc["wins"],
+            "losses": acc["losses"],
+            "ties": acc["ties"],
+            "win_rate": acc["wins"] / seasons,
+            "mean_money": acc["_money"] / seasons,
+            "opponent_mean_money": acc["_opp_money"] / seasons,
+        })
+    return merged
+
+
 def _latest_per_version(entries: list[dict]) -> list[dict]:
-    """Only entries that report evaluation_results represent a candidate
-    version's evidence; later entries for the same version (e.g. a
-    re-evaluation, or a `mark_final` record) supersede earlier ones.
+    """One merged record per candidate version.
+
+    A version's bundle is FROZEN once written, so every run logged
+    against it tests the same agent and the runs are independent samples
+    of one quantity. They are therefore POOLED, not superseded.
+
+    Superseding was a real bug: v14 was evaluated 100% against the fixed
+    bench in one run and head-to-head against v13 in later runs, and
+    because the last entry won, the bench evidence was discarded and
+    `_reference_win_rate` fell back to reading the head-to-head as if it
+    were the reference bench. v14 then ranked below v13 on evidence that
+    actually favoured it. Pooling also makes the sample sizes honest:
+    v14's 340 head-to-head seasons are worth more than any single batch,
+    and 20-season batches are individually noise (see research.md).
+
     Versions with no actual bundled submission are excluded (see
-    `_is_submittable`)."""
-    latest: dict[str, dict] = {}
+    `_is_submittable`).
+    """
+    by_version: dict[str, dict] = {}
     for entry in entries:
-        if not _is_submittable(entry["agent_version"]):
+        version = entry["agent_version"]
+        if not _is_submittable(version):
+            continue
+        acc = by_version.get(version)
+        if acc is None:
+            acc = {**entry, "evaluation_results": list(entry.get("evaluation_results") or [])}
+            by_version[version] = acc
             continue
         if entry.get("evaluation_results"):
-            latest[entry["agent_version"]] = entry
-        elif entry["agent_version"] in latest and entry.get("kaggle_result"):
-            # A later entry may only carry a fresh kaggle_result -- merge it in.
-            latest[entry["agent_version"]] = {**latest[entry["agent_version"]], "kaggle_result": entry["kaggle_result"]}
-    return list(latest.values())
+            acc["evaluation_results"] = _merge_results(
+                acc["evaluation_results"] + list(entry["evaluation_results"])
+            )
+            acc["commit_sha"] = entry.get("commit_sha", acc.get("commit_sha"))
+        if entry.get("kaggle_result"):
+            acc["kaggle_result"] = entry["kaggle_result"]
+    return list(by_version.values())
 
 
 def _reference_win_rate(entry: dict) -> float:

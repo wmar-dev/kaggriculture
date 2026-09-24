@@ -1288,6 +1288,80 @@ maxMarketOrdersPerTurn 10, shedCapacity 100, farmHandCostMult 1,
 turnsPerDay 24, and the rest), so none of this is an artefact of tuning
 against the wrong game.
 
+## v14: the shed is a shared hub, not an exclusive work site
+
+After thirteen straight negative results, the thing that was actually
+holding the herd back turned out to be in our own coordination code, not
+in the game.
+
+`claimed` exists so two units don't both walk to the same animal tile,
+where the second arrives to find the job already done. But the fallback
+branch of `_decide_hand_action` applied it to the SHED as well:
+
+```python
+shed_target = min(sheds, key=...)
+if shed_target in claimed:
+    return ["PASS"]          # <- one unit per turn, farm-wide
+```
+
+The shed is the opposite kind of place. It is the farm's only logistics
+hub -- every unit restocks feed there -- and the engine has **no
+collision rule at all**, so units share a tile freely. Claiming it meant
+that at most ONE unit per turn could travel to the shed; every other unit
+with nothing else to do simply stood still.
+
+**Measured on v13: 22.5% of ALL unit-turns were units idling purely
+because another unit had claimed the shed that turn.** That is two
+thirds of v13's 34% idle rate.
+
+This also explains results that had been unexplained for two sessions:
+
+- **Why adding hands never improved feeding.** Extra hands cannot reach
+  the shed, so they just PASS. Measured earlier: 9.4 hands produced 5.3
+  midday unfed animals against v13's 5.1 on 6.8 hands. That is the
+  signature of a serialised resource, not a labour shortage.
+- **Why feeding was always logistics-limited and never supply-limited**
+  (567 of 568 hungry-animal turns had wheat available).
+- **Why the herd could not be grown** by any combination of placement
+  duty, hiring and structure caps.
+
+Removing the shed from `claimed` drops idle unit-turns from **34.2% to
+16.4%**.
+
+**Results.** 100% vs random/starter/greedy at 62-74k (v13: 61-70k). Head
+to head against v13, deliberately over-sampled given how badly a
+20-season batch misled this project earlier:
+
+| batch | result |
+|---|---|
+| 20 seasons | 12W/8L (60%) |
+| 100 seasons | 56W/44L (56%) |
+| 100 seasons | 58W/42L (58%) |
+| 20 seasons | 9W/11L (45%) |
+| 100 seasons | 54W/46L (54%) |
+| **pooled, 340 seasons** | **189W/151L (55.6%)** |
+
+One-sided p ~= 0.02, and the money margin favoured v14 in **every** one
+of the five batches (+4.0%, +5.6%, +7.3%, +2.3%, +5.2%). Note the fourth
+batch on its own reads 45% -- a live reminder that 20 seasons decides
+nothing.
+
+This is a modest effect, not a transformative one: it converts idle
+turns into useful ones but does not lift the herd cap, which remains
+unexplained.
+
+### Tooling bug found while ranking v14
+
+`select_final._latest_per_version` let a later log entry SUPERSEDE
+earlier ones for the same version. Since a bundle is frozen once
+written, every run against it is an independent sample of one quantity,
+so the runs must be pooled. Superseding meant v14's 100%-vs-bench run was
+discarded in favour of a later head-to-head-only run, after which
+`_reference_win_rate` fell back to reading the head-to-head *as if it
+were* the reference bench (0.54) and ranked v14 **below** v13 on
+evidence that actually favoured it. Now pooled, with the game counts
+summed per opponent, which also makes sample sizes honest.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world

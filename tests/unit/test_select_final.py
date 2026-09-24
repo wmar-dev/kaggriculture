@@ -110,11 +110,43 @@ def test_rank_candidates_falls_back_to_local_win_rate_when_no_leaderboard_data()
     assert [e["agent_version"] for e in ranked] == ["v2", "v1"]
 
 
-def test_rank_candidates_uses_latest_entry_per_version():
-    entries = [_entry("v1", win_rate=0.3), _entry("v1", win_rate=0.8)]
-    ranked = select_final.rank_candidates(entries)
+def test_rank_candidates_pools_every_entry_for_a_version():
+    """A version's bundle is frozen, so repeated runs against it are
+    independent samples of one quantity and must be POOLED, not
+    superseded.
+
+    Regression test: superseding discarded v14's 100%-vs-bench run in
+    favour of a later head-to-head-only run, after which
+    `_reference_win_rate` fell back to reading the head-to-head as the
+    reference bench and ranked v14 below v13 on evidence that actually
+    favoured it.
+    """
+
+    def run(wins, losses):
+        return {
+            "agent_version": "v1",
+            "commit_sha": "sha-v1",
+            "evaluation_results": [
+                {
+                    "opponent": "starter",
+                    "seasons": wins + losses,
+                    "wins": wins,
+                    "losses": losses,
+                    "ties": 0,
+                    "win_rate": wins / (wins + losses),
+                    "mean_money": 0,
+                    "opponent_mean_money": 0,
+                }
+            ],
+            "kaggle_result": None,
+            "decision": "investigate",
+        }
+
+    ranked = select_final.rank_candidates([run(3, 7), run(8, 2)])
     assert len(ranked) == 1
-    assert select_final.average_win_rate(ranked[0]) == 0.8
+    # Pooled 11 wins of 20 -- not the later run's 0.8, nor the earlier 0.3.
+    assert select_final.average_win_rate(ranked[0]) == 0.55
+    assert ranked[0]["evaluation_results"][0]["seasons"] == 20
 
 
 def test_rank_candidates_handles_empty_log():
