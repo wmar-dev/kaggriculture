@@ -2297,6 +2297,37 @@ Also measured on top:
   57% over 120, then 42% over 240 -- neutral. Labour is not binding.
 - **HAND_SLACK 1 / 3:** 54% / 44% against v18. Kept at 2.
 
+### Post-v18 constant re-sweep and a fourth rejected cutoff
+
+Re-swept the opening-economy constants against v18 (not v17) in case
+cheaper feed shifted their optimum:
+
+| variant vs v18 base | result |
+|---|---|
+| REINVEST_RESERVE 0.8 | 52% decided (heavy ties) -- neutral |
+| REINVEST_RESERVE 1.2 | 38% (38W/62L, no ties) -- losing |
+| LAND_RESERVE_MULT 1.0 | 49% decided -- neutral |
+| LAND_RESERVE_MULT 0.9 | 68/100 ties -- indistinguishable |
+| HIRE_COST_CEILING 75 | 37% decided -- losing lean |
+| HIRE_COST_CEILING 100 | 15% (15W/85L) -- clearly losing |
+
+All rejected; REINVEST_RESERVE=1.0, LAND_RESERVE_MULT=1.2,
+HIRE_COST_CEILING=55 stand.
+
+Also tried replacing the plain reachability check on late animal buys
+(`BUY_CUTOFF_MARGIN`) with an actual ROI test -- expected revenue from
+remaining production cycles at TODAY's price must clear cost by a
+margin:
+
+| ANIMAL_ROI_MARGIN vs v18 | result |
+|---|---|
+| 1.0 | 31% (heavy ties) |
+| 0.5 | 33% |
+| 2.0 | 51% decided -- the closest to neutral, still no improvement |
+
+No margin beat the simple reachability check. Rejected; v18's
+BUY_CUTOFF_MARGIN=2 stands.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
