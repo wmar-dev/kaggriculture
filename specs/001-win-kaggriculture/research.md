@@ -2292,6 +2292,10 @@ Also measured on top:
 - **Holding MILK/WOOL in the shed while below 10% / 30% of base**
   (bounded to 60 shed items, final-day dump): 37% / 41%. Our restraint
   only relieves the opponent's market. Rejected.
+- **CARE only on days the animal is fed** (the engine banks the bonus
+  only when cared AND fed, so other cares are wasted unit-turns):
+  57% over 120, then 42% over 240 -- neutral. Labour is not binding.
+- **HAND_SLACK 1 / 3:** 54% / 44% against v18. Kept at 2.
 
 ## Outcome
 
