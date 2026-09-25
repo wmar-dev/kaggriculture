@@ -2077,6 +2077,62 @@ Two other hypotheses drawn from the same replay study, both rejected:
   35% at index 7. The churn was not the actual problem; reverted to the
   original "last N of current hand count" assignment.
 
+## Post-v17: scale-up still fails, and a real architectural gap identified
+
+Two more tests against v17, both rejected -- but the second one located
+something genuinely new: the actual mechanism the wall behind
+MAX_QUADRANTS/MAX_STRUCTURES needs, not just another confirmation that
+it exists.
+
+**MAX_QUADRANTS=4, re-tested on v17's faster capital base.** v17 races
+land and animal capital far more aggressively than v16 did -- if the
+4-quadrant failure under v16 had been a capital-speed problem, v17
+should fix it. It did not: **8% against v17**, matching v16's own 5%
+almost exactly. Capital speed was never the constraint.
+
+**Action-level replay analysis.** Both previously-downloaded replays
+were re-read for individual hand ACTIONS (not just outcome snapshots)
+during the day 12-13 ramp. The finding: hand slots are NOT role-locked
+at all. The same hand does `CARE` -> `PICKUP WHEAT` -> `FEED` ->
+`PLANT WHEAT` -> `WATER` across a single day for the 96,485-point
+agent -- freely switching between animal and crop duty turn to turn.
+Season-wide, only 14.2% of plantings die (DIG:PLANT ratio) despite this
+flexibility, and idle time (PASS) is 3.9% against our 12-16%. This is
+the actual mechanism: a UNIFIED dispatch across both subsystems, not
+the role-partitioned design (dedicated crop workers, dedicated herd
+hands) v16 and v17 both use.
+
+**A narrow test of the idea, rejected.** Rather than a full rewrite,
+added a lightweight escape hatch: an idle herd-duty hand (nothing
+herd-related to do, about to walk to the shed with nothing there
+either) checks for a plot tile one dry day from becoming a weed and
+waters it instead. The mechanism is genuinely rare (7 crossings in a
+720-step season) and adds no measurable per-turn cost (0.74ms mean,
+1.82ms max -- nowhere near a timing issue). It still lost, consistently:
+10% then 25% over two independent 40-season batches (pooled 14W/66L,
+17.5% over 80 seasons). A turn-by-turn action diff against v17 in a
+non-competitive trace showed zero behavioural difference, confirming
+the loss is a real, if small-magnitude-per-instance, strategic cost
+from a genuinely rare intervention -- not noise and not a bug.
+
+**Reading.** The real agents' flexibility is not a bolt-on feature
+layered on top of role-partitioned dispatch -- it appears to be the
+WHOLE dispatch model: every hand considers every task type, every turn,
+with urgency (not subsystem membership) deciding what it does. A narrow
+escape hatch tests a much weaker version of that idea and, predictably,
+gets a much weaker (here, negative) result. Properly testing the real
+hypothesis needs a genuine unified-dispatch rewrite -- replacing
+`_decide_hand_action` and `_decide_crop_action`'s hard partition with
+one function that ranks all tile-needs (animal and crop) by urgency and
+lets ANY unit act on the most urgent one -- not another incremental
+addition to the role-partitioned design. That is a substantially larger
+change with real risk of reproducing v9's original crop-abandonment
+failure if the urgency ranking is wrong, and was not attempted this
+round.
+
+**v17 stands as the current agent**, submitted and PENDING on the real
+leaderboard as of this writing.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
