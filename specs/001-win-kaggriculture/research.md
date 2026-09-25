@@ -1892,6 +1892,43 @@ number -- it is computed only from the three batches run specifically
 against the final, bundle-verified `submissions/v16/main.py` (ceiling
 55), listed in the table.
 
+## Fertilizing the wheat plot: a "free" yield boost that costs more than it returns
+
+FERTILIZE doubles a one-time crop's per-watering yield during its bonus
+window (WHEAT: 1 -> 2 per water, raising its achievable max from 4 to
+its true cap of 6 -- 50% more per fully-fertilized plant), and
+fertilizer is a free by-product currently sold for ~40/unit into a
+market with no real buyer. It looked like close-to-free value.
+
+Two real bugs had to be fixed before it could even be measured:
+
+1. **Priority starvation.** With a 4-tile block on WHEAT's 5-day cycle,
+   there is almost always SOME tile needing water somewhere, so a
+   fertilizer resupply trip gated behind "only if there is truly nothing
+   else to do anywhere in the block" fired 5 times in a whole season.
+   Reordering so the resupply competes as soon as the tile underfoot
+   has no local work (rather than after scanning the whole block) barely
+   helped.
+2. **The real blocker: `_market_orders` sold the entire FERTILIZER shed
+   stock every single turn.** It is not a premium good (base 100, not
+   >100), so `SELL_BATCH_CAP` never applied -- there was nothing left
+   for a crop worker's own PICKUP order to draw from 1520 of 1523
+   checked moments. Reserving a few units unsold (the same pattern WHEAT
+   already uses) fixed this and FERTILIZE finally fired.
+
+**It still lost.** Three batch sizes, all against v16, all 40 seasons:
+batch 4 -> 20%, batch 2 -> 18%, batch 1 -> 48% (the best, but still not
+a clear win). None beat v16. The daily overnight inventory sweep
+(`_drop_inventories_to_shed` empties every unit's inventory back to the
+shed each night) means unused fertilizer is lost and re-fetched the next
+day regardless of batch size, so the travel cost recurs almost daily --
+and against WHEAT's own low unit price (~40-55), the yield gain does not
+cover it. Consistent with the session's broader lesson: anything adding
+travel on top of an already labour-constrained plot costs more than it
+returns, however "free" the input looks in isolation.
+
+Reverted; v16 (no fertilizer) stands.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
