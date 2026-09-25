@@ -1989,6 +1989,94 @@ one goose is a worse per-slot investment than the COW/SHEEP it displaces
 at this herd scale, confirming the original v8-era rejection was
 architecture-level, not a dosage problem that more hands would fix.
 
+## v17: the harder rewrite -- match the real opening, not the herd cap
+
+v16 landed at 485.9 on the real leaderboard, essentially tied with v15's
+489.8, despite dominating v15 87.5% in local self-play. Real match data
+(via the episode API) showed why: v16 was losing money, not just win
+rate, against opponents scoring 76k-129k -- a different tier entirely.
+This section is the response: study exactly how that tier's agents
+operate in the OPENING, not just their steady-state production mix.
+
+### What the replays showed, day by day
+
+Both previously-downloaded top-agent replays were re-read for their
+early-game PACING (hands, quadrants, animals, money), not just their
+season totals. Measuring at hour 0 gives hands=0 every day (the engine
+clears `farm["hands"]` nightly -- the same mistake documented earlier
+this session for our own agent); re-measured at hour 12.
+
+**112999172 (96,485 points, 4 quadrants):** money 78 -> 6 -> 204 -> 107
+-> 94 -> 661 -> 173 -> 380 -> 1723 -> 26 for days 0-9 -- consistently
+near zero. Meanwhile ALL FOUR quadrants are bought by day 11, and hands
+reach 12 by day 11 and hold there for the rest of the season.
+
+**90494316 (183,993 points, 3 quadrants):** the same pattern. Money:
+105, 21, 119, 5, 17, 984, 1130, 319, 19, 1724 for days 0-9. All 3
+quadrants bought by day 11 (herd's own quadrant count matches ours).
+Herd reaches 14 by day 11 and holds there for the rest of the season --
+the SAME size v16 reaches, confirming (again) that the gap to this tier
+is not herd size.
+
+Both agents spend down to near-zero cash in the opening ~10 days,
+racing to establish land, hands and animals simultaneously, rather than
+keeping the 2x-3x safety reserve our REINVEST_RESERVE/land-purchase
+gates required.
+
+### Two changes, isolated then combined
+
+**Land purchase reserve.** Changed the `BUY_LAND` gate from requiring
+2x the next quadrant's cost in reserve to a tunable multiplier,
+MAX_QUADRANTS unchanged at 3 (isolating pacing from land QUANTITY,
+which was already re-confirmed correct this session). Swept 1.0/1.1/1.2
+/1.5/2.0 against v16 (20-40 seasons): 25%/30%/**62%**/55%/50%(baseline).
+Confirmed 1.2 at 100 seasons: 55W/35L/10T; pooled with the screening
+batch, **80W/43L/17T, 57.1% over 140 seasons**. Real, but modest.
+
+**Reinvest reserve, re-swept on the land-rush base.** With land already
+racing faster, re-tested REINVEST_RESERVE (the animal-purchase gate)
+against the land-rush variant rather than against v16 directly.
+1.0 -> **90%** (36W/4L, 40 seasons), 1.5 -> 68%. Confirmed 1.0 at 100
+seasons: 81W/19L; pooled, **117W/23L, 83.6% over 140 seasons** -- a
+much larger effect than the land change alone.
+
+**Combined**, direct against v16: 38W/2L (95%, 40 seasons), confirmed
+99W/1L (99%, 100 seasons). A THIRD batch, logged against the final,
+bundle-verified `submissions/v17/main.py`: 95W/5L (95%, 100 seasons).
+**Pooled across all three: 232W/8L, 96.7% over 240 seasons** -- the
+strongest and most consistent result of the project by a wide margin,
+well past v16's own 87.5% over v15.
+
+A traced episode matches the real replays' shape almost exactly: money
+7, 78, 1, 46, 135 for days 0-8, herd reaching 15 and 3 quadrants by day
+10-12, then smooth, substantial growth for the rest of the season (final
+67,433 vs v16's 64,158 in that game). 100% vs random/starter/greedy at
+75-81k, the highest reference-bench money of any version -- v16 was
+72-78k.
+
+### What did NOT work in this round
+
+Two other hypotheses drawn from the same replay study, both rejected:
+
+- **CARROT instead of WHEAT** -- tests whether fast-cycling alone
+  (without WHEAT's expense-offset) is sufficient. It is not: 8% against
+  v16, despite the crop itself selling fine (avg 46.2, above its base of
+  35). The reason: WHEAT has the gentlest glut curve of any crop in the
+  game (`log`/0.20, tied only with EGG), which is why it tolerates being
+  both fed AND sold in surplus. CARROT's is `sqrt`/0.70. No other crop
+  shares WHEAT's specific combination of properties.
+- **GOOSE, hard-capped** -- re-tested now that v16 runs more hands (9-10
+  vs the 6-7 available when GOOSE was rejected in the v8 era), using a
+  hard cap instead of the original flooding price-ratio valuation.
+  Capped at 3: 5%. Capped at 1 (essentially zero flooding risk): 0% over
+  40 seasons, with herd size, hands and growth trajectory all matching
+  v16's own baseline -- decisive even at minimal exposure.
+- **Fixed crop-worker hand indices** (removing a theorised "role churn"
+  where a hand's crop/herd assignment shifts as total hand count grows)
+  -- measured WORSE than the churn it was meant to fix: 8% at index 4,
+  35% at index 7. The churn was not the actual problem; reverted to the
+  original "last N of current hand count" assignment.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
