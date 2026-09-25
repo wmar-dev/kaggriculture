@@ -2328,6 +2328,20 @@ margin:
 No margin beat the simple reachability check. Rejected; v18's
 BUY_CUTOFF_MARGIN=2 stands.
 
+Also swept PLOT_WORKERS (the wheat-plot crew size), on the theory that
+gated feeding needs less wheat so fewer/more workers there might now
+pay off differently:
+
+| PLOT_WORKERS vs 3 | result |
+|---|---|
+| 2 | 17% (17W/83L) -- clearly losing |
+| 4, n=100 | 55% (68% weak-town bucket, n=25) -- looked promising |
+| 4, n=260 confirmation | 52% overall, 56% weak (n=70) -- noise |
+
+The weak-town 68% did not survive a bigger sample (research.md's own
+"trust under ~70% needs 100+ seasons" rule, vindicated again).
+PLOT_WORKERS=3 stands.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
