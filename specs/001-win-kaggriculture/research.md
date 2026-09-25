@@ -1950,6 +1950,45 @@ market-constrained, not an arbitrary number. v16's configuration is a
 robust local optimum, not an artefact of the smaller economy it was
 partly tuned under.
 
+## Sharpening why WHEAT worked: two more targeted tests, both rejected
+
+With v16 established, two hypotheses about WHAT specifically made it
+work were tested directly, each isolating one candidate property.
+
+**Is fast-cycling alone sufficient (without the expense-offset)?**
+CARROT is even faster than WHEAT (2-day bonus window vs WHEAT's 3,
+max_yield_day 3 vs 4) but is a genuine second market -- we never buy
+carrots. Swapped PLOT_CROP to CARROT with v16's exact infrastructure:
+257 units sold at avg 46.2 (above its base of 35, so the crop mechanics
+themselves work fine) but **8% against v16**. Fast-cycling alone is not
+sufficient; CARROT competes for labour as a pure second market just
+like STRAWBERRY and MELON did.
+
+The reason surfaces on inspection: WHEAT has `above_func=log,
+above_target=0.20` -- the gentlest glut curve of any crop in the game
+(tied only with EGG). CARROT's is `sqrt, 0.70`; TOMATO `sqrt, 0.60`;
+STRAWBERRY `linear, 1.60`; MELON `sq, 3.60`. WHEAT tolerates being both
+fed to the herd AND sold in surplus without crashing precisely because
+its price barely responds to volume. No other crop shares this
+property, so the WHEAT result does not generalise to "any fast crop
+works" -- it was three properties in one product (gentle glut, direct
+expense offset, short cycle), and WHEAT may be the only crop in the
+game that has all three.
+
+**Is GOOSE viable now that hands are more plentiful?** EGG shares
+WHEAT's gentle glut curve, and v16 runs 9-10 hands where GOOSE was last
+rejected under a 6-7 hand budget. Re-tested with a HARD CAP (not the
+original price-ratio valuation, which flooded the herd with geese
+purely because dividing by `interval=1` always outranks dividing by
+2 or 3, independent of true output -- a different failure mode from
+"GOOSE itself is bad"). Capped at 3: **5%**. Capped at 1 -- a single
+goose, essentially zero flooding risk -- **0% over 40 seasons**, with
+herd size, hand count and growth trajectory all indistinguishable from
+v16's own baseline. Decisive at the smallest possible exposure: even
+one goose is a worse per-slot investment than the COW/SHEEP it displaces
+at this herd scale, confirming the original v8-era rejection was
+architecture-level, not a dosage problem that more hands would fix.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
