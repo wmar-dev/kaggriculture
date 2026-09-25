@@ -1929,6 +1929,27 @@ returns, however "free" the input looks in isolation.
 
 Reverted; v16 (no fertilizer) stands.
 
+## Re-validating the fundamental knobs under v16's economy
+
+With a genuinely stronger economy in place (v16 vs v15: 87.5%), it was
+worth checking whether knobs tuned years earlier, under much smaller
+economies, still hold. Four re-sweeps against v16, all 40 seasons:
+
+| knob | value tested | result |
+|---|---|---|
+| MAX_STRUCTURES (15) | 18 | 5% |
+| MAX_STRUCTURES (15) | 20 | 8% |
+| MAX_QUADRANTS (3) | 4 | 5% |
+| REINVEST_RESERVE (2) | 1.5 | 50% (indistinguishable) |
+| REINVEST_RESERVE (2) | 2.5 | 5% |
+
+All confirm the existing values rather than move them. Land tells the
+same story directly: at herd=15 only 3 near-shed tiles remain empty, so
+the herd cap is now genuinely land-constrained as well as
+market-constrained, not an arbitrary number. v16's configuration is a
+robust local optimum, not an artefact of the smaller economy it was
+partly tuned under.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
