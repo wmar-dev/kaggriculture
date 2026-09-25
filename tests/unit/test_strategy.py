@@ -217,3 +217,76 @@ def test_plot_tiles_are_spatially_contiguous():
             continue
         span = max(abs(a[0] - b[0]) + abs(a[1] - b[1]) for a in block for b in block)
         assert span <= 8, f"worker {worker}'s block is scattered (internal span {span}): {block}"
+
+
+def _obs_with_animal(tile: dict, day: int, prices: dict):
+    board = [[None for _ in range(10)] for _ in range(10)]
+    board[0][0] = tile
+    farm = {
+        "money": 1000,
+        "tiles": board,
+        "farmer": [9, 9],
+        "hands": [],
+        "unlocked_quadrants": ["NW"],
+        "hires_today": 0,
+    }
+    return parse_observation(
+        {
+            "player": 0,
+            "step": 0,
+            "day": day,
+            "hour": 5,
+            "farms": [farm, dict(farm)],
+            "market": {"inventory": {}, "prices": prices},
+            "town": {"unlocked_shops": []},
+            "private": {"shed": {}, "seeds": {}, "inventories": [{}]},
+        }
+    )
+
+
+def _cow(**kw):
+    tile = {"kind": "PASTURE", "animal": "COW", "placed_day": 0, "fed_today": False,
+            "cared_today": False, "consecutive_unfed": 0, "yield_units": 0}
+    tile.update(kw)
+    return tile
+
+
+def test_should_feed_skips_optional_feed_when_product_is_crashed():
+    """v18: the engine produces an animal's base unit whether or not it
+    was fed; an off-schedule feed only banks one bonus unit, so it is not
+    worth a wheat when milk trades far below wheat."""
+    from kaggriculture_agent.strategy import _should_feed
+
+    # COW first_yield_day 8, interval 2: day 10 -> tonight is day 11, a
+    # non-production night.
+    obs = _obs_with_animal(_cow(), day=10, prices={"MILK": 5, "WHEAT": 50})
+    assert _should_feed(obs, obs.tile_at(0, 0)) is False
+
+
+def test_should_feed_always_feeds_before_an_escape():
+    from kaggriculture_agent.strategy import _should_feed
+
+    obs = _obs_with_animal(_cow(consecutive_unfed=1), day=10, prices={"MILK": 5, "WHEAT": 50})
+    assert _should_feed(obs, obs.tile_at(0, 0)) is True
+
+
+def test_should_feed_always_feeds_on_a_production_night():
+    """A fed production night is what cashes in the banked care bonus."""
+    from kaggriculture_agent.strategy import _should_feed
+
+    obs = _obs_with_animal(_cow(), day=9, prices={"MILK": 5, "WHEAT": 50})
+    assert _should_feed(obs, obs.tile_at(0, 0)) is True
+
+
+def test_should_feed_feeds_when_product_is_valuable():
+    from kaggriculture_agent.strategy import _should_feed
+
+    obs = _obs_with_animal(_cow(), day=10, prices={"MILK": 160, "WHEAT": 30})
+    assert _should_feed(obs, obs.tile_at(0, 0)) is True
+
+
+def test_should_feed_never_feeds_on_the_final_day():
+    from kaggriculture_agent.strategy import SEASON_DAYS, _should_feed
+
+    obs = _obs_with_animal(_cow(consecutive_unfed=1), day=SEASON_DAYS - 1, prices={"MILK": 160, "WHEAT": 30})
+    assert _should_feed(obs, obs.tile_at(0, 0)) is False

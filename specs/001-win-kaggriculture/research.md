@@ -2222,6 +2222,77 @@ under is different.
 **Reverted. v17 stands as the current agent** (`strategy.py` and
 `tests/unit/test_strategy.py` both unchanged from the v17 commit).
 
+## v18: stop paying to feed animals whose product has crashed
+
+### What real matches showed
+
+v17's real record splits sharply on the town's shop draw. Counting the
+MILK+WOOL demand of the unlocked shops (single-product shops x2), v17
+went **1W/7L in towns with demand <= 3 and 9W/4L above it**. In the
+worst loss (episode 113151674) both prices hit 1 by day ~18 while every
+animal still ate a wheat a day, and our money flatlined at ~13k from
+day 18. `evaluation/demand_bench.py` now reports every head-to-head
+split by that demand (post-hoc, since the shop draw depends on board
+state through the weed-spawn RNG and cannot be pinned by the seed).
+
+### Two neutral or negative changes on the way
+
+- **Shared seed budget (kept, neutral).** The engine drops ALL of a
+  turn's PLANT requests for a crop when they exceed the seeds in stock.
+  Three crop workers deciding against the same raw count silently turned
+  25% of v17's PLANTs into PASS. Fixed with a per-turn budget shared by
+  the crew. Measured 53% vs v17: correct, but not where the losses are.
+- **Strawberry second plot (rejected).** A second crew on a STRAWBERRY
+  plot, seeded only from cash above 1,500: sizes 8 / 12 / 16 went
+  **1W/119L, 0W/120L, 0W/120L**, losing in weak towns too. It barely
+  planted (16 seeds in a traced game, since v17 spends down to ~0) yet
+  still cost ~10k, because fencing the next ring of tiles pushes
+  pastures further out and the crew comes off the herd. That makes 11+
+  failed strawberry/melon attempts.
+
+### The mechanism
+
+`_daily_refresh_animals` produces an animal's **base** unit on schedule
+whether or not it was fed. Feeding does exactly two things: resets the
+escape counter (two consecutive unfed days and the animal escapes), and,
+with CARE, banks a +1 bonus unit paid out on the next *fed* production
+night. Fertilizer appears every night regardless.
+
+So an off-schedule feed buys one product unit for one wheat. A local
+price trace showed MILK at 1-20 by day 15-18 in almost every self-play
+town, not only the weak ones, while WHEAT trades ~50. v17 was feeding
+every animal every day at a loss for half the season.
+
+`_should_feed`: always feed on a production night (it cashes the bonus)
+and after an unfed day (or it escapes); otherwise feed only when the
+product trades at >= `FEED_VALUE_RATIO` x wheat; never on the final
+day. Wheat purchases follow today's actual feed need.
+
+| variant vs v17 | weak | strong | all |
+|---|---|---|---|
+| ratio 0 (= old behaviour) | 67% | 46% | 52% (120) |
+| ratio 0.5 | 86% | 55% | 62% |
+| ratio 1.0 | 94% | 64% | 73% |
+| ratio 2.0 | 93% | 59% | 67% |
+| ratio 1.0 + final-day rule | 88% | 65% | 70% (200) |
+| **ratio 1.5 + final-day rule** | **94%** | **74%** | **78% (200)** |
+
+Head-to-head, ratios 1.0-2.0 are nearly identical (46-48% with many
+ties): prices sit far above or far below wheat, so the threshold rarely
+decides anything. The final-day rule alone measured 93W/27L against the
+same build without it.
+
+Also measured on top:
+
+- **Late animal-buy cutoff** (skip an animal that cannot reach its first
+  yield before the season ends, margin 2 days): 65W/19L/36T. Margins 0
+  and 5 are indistinguishable from 2. Kept.
+- **Bigger herd now that feed is cheaper:** MAX_STRUCTURES 18 -> 4%,
+  21 -> 2%. The cap is not about feed cost. Rejected.
+- **Holding MILK/WOOL in the shed while below 10% / 30% of base**
+  (bounded to 60 shed items, final-day dump): 37% / 41%. Our restraint
+  only relieves the opponent's market. Rejected.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
