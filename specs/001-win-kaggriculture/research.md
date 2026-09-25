@@ -2133,6 +2133,95 @@ round.
 **v17 stands as the current agent**, submitted and PENDING on the real
 leaderboard as of this writing.
 
+## The unified-dispatch rewrite: implemented correctly, still loses
+
+Following through on the mechanism identified above: replaced
+`_decide_hand_action` (herd) and `_decide_crop_action` (crop) with one
+`_decide_unit_action` used by every unit, farmer included. No more
+`PLOT_WORKERS`-sized role partition -- each unit's own tile always wins
+first, and otherwise a farm-wide scan (`_find_best_task`) picks the most
+urgent task across BOTH animal and crop tiles together, ranked by a
+three-tier urgency (0 = will be permanently lost today -- an animal one
+missed feed from escaping, a one-time crop one missed watering from
+becoming a weed; 1 = routine daily care or a ready harvest; 2 =
+opportunistic planting/fertilizer collection) with distance breaking
+ties within a tier. This was the explicit guard against reproducing v9's
+original crop-abandonment failure, where a naive nearest-tile loop let
+watering lapse because animals were always closer to the shed.
+
+**Four real bugs, found in sequence, each one only exposed once the
+previous was fixed:**
+
+1. **Thrashing placement duty.** `_placement_duty_index` picked the unit
+   NEAREST the shed BY POSITION, recomputed fresh every turn. Under the
+   old role-partitioned design that was harmless (herd-duty units stayed
+   clustered near the shed, so "nearest" rarely changed). Under unified
+   dispatch, units roam far more (the crop plot is several tiles out by
+   design), so "nearest" reshuffled constantly -- traced directly, duty
+   flipped across six different units within one 12-hour window, and
+   NONE of them ever completed the multi-turn walk to the shed. Fixed by
+   keying off hand INDEX (stable for the whole day) instead of position.
+2. **Arrival not recognized.** Once duty stability was fixed, the duty
+   unit still oscillated between two tiles forever. Cause:
+   `_decide_unit_action` only special-cased "not yet at the shed -> walk
+   there"; arriving fell through to the general farm-wide task search,
+   which promptly found something else worth doing and walked the unit
+   back out. Fixed by handling "already at the shed -> PICKUP" as part
+   of the SAME branch, not a separate one reached later.
+3. **Wheat-fetch invisibility.** With both of the above fixed, herd size
+   was solid but feeding still collapsed in some episodes (a herd that
+   grew 7 -> 13 in three days left all 13 unfed the same day). Cause:
+   `_unit_tile_work`'s FEED action is only returned to a unit ALREADY
+   carrying wheat (correctly -- there is nothing to feed with otherwise)
+   -- but crop watering needs no inventory at all, so it is visible to
+   EVERY unit, every turn. Once the herd outgrew the wheat-fetch rate,
+   most units simply could not SEE the feeding crisis and defaulted to
+   crop work. Fixed by adding "go fetch wheat" as an explicit competing
+   candidate in `_find_best_task`, at the true severity of the need,
+   rather than leaving it as a passive fallback that crop tasks (always
+   visible) starved out.
+4. **Already-at-the-shed, again.** The fix for (3) had the SAME latent
+   bug as (2): animals can be built directly ON shed-access tiles (an
+   existing quirk, confirmed present in v17 too, not introduced by this
+   rewrite), and a unit already standing there computed a wheat-fetch
+   target equal to its own position -- `_step_toward(pos, pos)` is PASS.
+   Traced directly: four units sat on shed tiles for the whole of day 1,
+   returning PASS every single turn, with 4 WHEAT sitting in the shed
+   the entire time and the whole herd unfed for two straight days -- a
+   total wipeout by day 2. Fixed with the same "already there" special
+   case as (2).
+
+**With all four fixed, the mechanics are genuinely healthy**: herd
+reached and held 15 in every one of 8 sampled episodes (previously
+0-15, wildly inconsistent), DIG:PLANT ratio as low as 1.8% (better than
+the 14.2% the studied replay itself showed), idle time as low as 4.6-
+8.7% (better than v17's 12-16%), and a traced episode matched the real
+replays' opening shape -- money growing smoothly to 85,747 against
+v17's 81,093, a clean win.
+
+**It still loses.** 40 seasons: 10W/30L (25%). 60 more: 17W/43L (28%).
+Pooled: 27W/73L, 27% over 100 seasons -- stable across two large
+batches, not noise. Every individual health metric (herd consistency,
+idle time, crop survival) is equal to or BETTER than v17's own numbers,
+yet the aggregate result is a clear, consistent loss.
+
+**Reading.** This is a genuine negative result, not an unfinished one --
+four real bugs were found and fixed, each confirmed by direct
+instrumentation, and the final version has no known defects. The most
+likely explanation is architecture-fit rather than a flaw in the idea
+itself: our crop plot is deliberately placed FAR from the shed (to
+protect the near-shed ring for pastures -- fencing that ring measured
+0W/20L on its own, see the v14 section), so "flexibility" costs more
+travel for THIS farm's specific geometry than it evidently does for the
+real opponents studied, whose land layout and scale (4 quadrants, 25
+animals, 80 tiles) are substantially different from what this project
+has been able to reach. Replicating an observed BEHAVIOUR does not
+automatically transfer when the underlying GEOMETRY it was observed
+under is different.
+
+**Reverted. v17 stands as the current agent** (`strategy.py` and
+`tests/unit/test_strategy.py` both unchanged from the v17 commit).
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
