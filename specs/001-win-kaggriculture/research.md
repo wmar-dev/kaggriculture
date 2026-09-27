@@ -2342,6 +2342,38 @@ The weak-town 68% did not survive a bigger sample (research.md's own
 "trust under ~70% needs 100+ seasons" rule, vindicated again).
 PLOT_WORKERS=3 stands.
 
+### Demand-gated MAX_STRUCTURES: a dead end under two different timing strategies
+
+v18 still wins strong-demand towns notably less (74%) than weak-demand
+ones (96%, `evaluation/demand_bench.py` vs v17, n=120) -- the same gap
+its own feeding-ratio sweep table above never closed. Every past
+MAX_STRUCTURES raise was uniform across all towns and lost badly because
+it gluts weak-demand towns (see "v15 tips the market into glut" above);
+tried making the ceiling demand-gated instead, only raising it
+(15 -> 18) in towns that read as strong-demand, in two variants:
+
+| variant vs v18 (20 seasons) | result |
+|---|---|
+| gate on the LIVE partial shop draw so far | 20% (4W/13L/3T) |
+| gate on that draw EXTRAPOLATED to the full 8 shops | 10% (2W/16L/2T) -- worse |
+
+Both rejected. The mechanism is identifiable from CONTEST.md itself, not
+guessed: shops unlock one at a time every `townShopUnlockInterval=3`
+days, up to 8 instances, so the full draw isn't known until day ~24 of
+30 -- by which point most REINVEST_RESERVE-gated herd growth has already
+happened, so waiting for a reliable signal arrives too late to act on.
+Extrapolating instead (`demand_so_far / shops_so_far * 8`) makes the
+signal available as early as day 3, but with n=1-2 shops it is extremely
+noisy: a single YARN_STORE (WOOL, 2x weight) unlocking first alone
+yields an estimate of 16, far past the >=4 threshold, from pure luck --
+falsely flagging many actually-weak towns as strong very early, which
+raises the ceiling exactly where it gluts the market worst. **Do not
+retry demand-gated MAX_STRUCTURES under either timing strategy without a
+fundamentally different signal** (something observable before shops
+start unlocking at all, if one exists) -- 15 continues to look like a
+robust, town-shape-independent economic optimum, not a number this
+lever can beat.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
