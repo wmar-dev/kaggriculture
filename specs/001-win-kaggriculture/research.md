@@ -2374,6 +2374,42 @@ start unlocking at all, if one exists) -- 15 continues to look like a
 robust, town-shape-independent economic optimum, not a number this
 lever can beat.
 
+### Replay diagnostic of actual strong-town losses: capacity and composition are not the differentiator
+
+Ran a turn-by-turn trajectory dump (money, herd size, COW/SHEEP split,
+MILK/WOOL price, shop count, once per day) on several real v18-vs-v17
+strong-demand-town losses, rather than guessing at another parameter.
+Findings, directly from the data:
+
+- Both sides converge to nearly the SAME herd size (14-15, i.e. both
+  saturate MAX_STRUCTURES) and the SAME rough COW:SHEEP composition
+  (e.g. both C11/S4, or both C10/S5) by mid-game in every loss examined.
+  Capacity and product-mix are not what's deciding these games.
+- WOOL price craters to near the $1 floor and STAYS there for many
+  consecutive days once several shops have unlocked, far more
+  persistently than MILK in the same games.
+- The money gap that decides the outcome is small and gradual, opening
+  around day 14-15 and slowly widening -- not one dramatic event.
+
+Tried exempting SHEEP from `FEED_VALUE_RATIO`'s price gate (always feed
+it, to keep banking the CARE bonus -- CONTEST.md: the bonus is only
+banked on a day the animal is BOTH fed AND cared for, so every gated
+skip during the WOOL crash forfeits that day's banking, not just the
+wheat cost) while leaving COW at the already-validated 1.5 ratio:
+
+| variant vs v18 (20 seasons) | result |
+|---|---|
+| always-feed WOOL, keep COW gated at 1.5 | 15% (3W/17L) -- worse than either MAX_STRUCTURES attempt |
+
+Rejected. The wheat cost of feeding a near-worthless product every day
+evidently outweighs the banked bonus even accounting for compounding.
+**Three different, real-evidence-based mechanisms are now ruled out for
+this gap** (live-gated capacity, extrapolated-gated capacity,
+asymmetric feed-gating) -- the next investigation should look elsewhere
+entirely (e.g. sell-order pacing/timing for premium goods specifically
+under a sustained crash, or accept the gap as v18's current ceiling)
+rather than a fourth variant on these same three mechanisms.
+
 ## Outcome
 
 All Technical Context unknowns are resolved, including R1's real-world
