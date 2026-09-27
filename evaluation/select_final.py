@@ -19,6 +19,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = REPO_ROOT / "experiments" / "log.jsonl"
 SUBMISSIONS_DIR = REPO_ROOT / "submissions"
 
+# A true 55-60% edge needs roughly 100+ seasons to separate from a coin
+# flip (specs/001-win-kaggriculture/research.md, "Bench noise": a 65%
+# result over 20 seasons was 53% pooled over 120). Once the fixed
+# reference bench (random/starter/greedy) saturates at ~100%, ranking
+# actually resolves on the self-play head-to-head result against the
+# version being replaced -- so that is the sample size this threshold
+# guards (specs/002-improve-agent/research.md R2).
+CONFIRMATION_SEASONS = 100
+
 sys.path.insert(0, str(REPO_ROOT / "evaluation"))
 from run_batch import _commit_sha, average_win_rate  # noqa: E402
 
@@ -166,6 +175,17 @@ def _self_play_win_rate(entry: dict) -> float | None:
     return sum(r["win_rate"] for r in results) / len(results)
 
 
+def _self_play_seasons(entry: dict) -> int:
+    """Pooled season count over the same path-shaped-opponent result set
+    `_self_play_win_rate` isolates -- how much head-to-head evidence
+    against a prior version actually backs this candidate's ranking."""
+    results = [
+        r for r in (entry.get("evaluation_results") or [])
+        if "/" in r["opponent"] or r["opponent"].endswith(".py")
+    ]
+    return sum(r.get("seasons") or (r.get("wins", 0) + r.get("losses", 0) + r.get("ties", 0)) for r in results)
+
+
 def _earned_promotion(entry: dict) -> int:
     """1 unless the version was measured head-to-head and LOST.
 
@@ -265,6 +285,13 @@ def format_recommendation(entry: dict) -> str:
         lines.append(f"  This version's own recorded leaderboard public_score: {entry['kaggle_result']['public_score']}")
     else:
         lines.append("  NOTE: this version has not been submitted to Kaggle yet -- this recommendation is local-evidence only.")
+    self_play_seasons = _self_play_seasons(entry)
+    if self_play_seasons < CONFIRMATION_SEASONS:
+        lines.append(
+            f"  CAUTION: only {self_play_seasons} head-to-head season(s) recorded against a prior "
+            f"version (< {CONFIRMATION_SEASONS}) -- this promotion is unconfirmed; see "
+            "specs/002-improve-agent/research.md R2 before trusting it."
+        )
     return "\n".join(lines)
 
 

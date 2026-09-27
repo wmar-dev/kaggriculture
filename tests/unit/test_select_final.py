@@ -247,3 +247,51 @@ def test_local_evidence_still_wins_when_the_newer_version_is_untested():
         {"opponent": "submissions/v3/main.py", "win_rate": 0.8, "mean_money": 30000, "opponent_mean_money": 20000}])
     ranked = select_final.rank_candidates([older, newer])  # newer has no real score yet
     assert ranked[0]["agent_version"] == "v4"
+
+
+def _fixed_bench_results(seasons=20):
+    """Fixed reference-opponent results with every field
+    `format_recommendation` reads, saturated at 100% (the normal
+    steady-state for this project by this point)."""
+    return [
+        {"opponent": n, "win_rate": 1.0, "seasons": seasons, "wins": seasons, "losses": 0, "ties": 0,
+         "mean_money": 40000, "opponent_mean_money": 3000}
+        for n in ("random", "starter", "greedy")
+    ]
+
+
+def test_format_recommendation_cautions_when_top_candidate_has_no_self_play_result():
+    """Regression guard for spec 002-improve-agent FR-003/FR-007: a
+    candidate tested only against the weak fixed bench, never head-to-head
+    against the version it would replace, must not be recommended as a
+    confirmed promotion silently -- `_earned_promotion` already defaults
+    to "earned" when there is no self-play data at all, so this is the
+    one case that needs an explicit caution to avoid being invisible."""
+    entry = _entry_with_opponents("v19", _fixed_bench_results())  # no path-shaped opponent at all
+    assert "CAUTION" in select_final.format_recommendation(entry)
+
+
+def test_format_recommendation_cautions_when_self_play_seasons_below_threshold():
+    """Regression guard: the exact failure mode research.md's "Bench
+    noise" finding documents -- a promising small-sample head-to-head
+    result (here 20 seasons) must not be recommended as confirmed."""
+    entry = _entry_with_opponents("v19", _fixed_bench_results() + [
+        {"opponent": "submissions/v18/main.py", "win_rate": 0.65, "seasons": 20, "wins": 13, "losses": 7, "ties": 0,
+         "mean_money": 30000, "opponent_mean_money": 20000}])
+    assert "CAUTION" in select_final.format_recommendation(entry)
+
+
+def test_format_recommendation_no_caution_when_self_play_seasons_meet_threshold():
+    """Once the pooled head-to-head sample reaches the confirmation
+    threshold (research.md R2, 100 seasons), no caution should print --
+    otherwise every real promotion would carry a permanent, unhelpful
+    warning."""
+    # Two pooled batches (40 + 60 = 100 seasons), matching how repeated
+    # runs against the same frozen bundle are logged in practice.
+    entry = _entry_with_opponents("v19", _fixed_bench_results() + [
+        {"opponent": "submissions/v18/main.py", "win_rate": 0.6, "seasons": 40, "wins": 24, "losses": 16, "ties": 0,
+         "mean_money": 30000, "opponent_mean_money": 20000},
+        {"opponent": "submissions/v18/main.py", "win_rate": 0.55, "seasons": 60, "wins": 33, "losses": 27, "ties": 0,
+         "mean_money": 30000, "opponent_mean_money": 20000},
+    ])
+    assert "CAUTION" not in select_final.format_recommendation(entry)
